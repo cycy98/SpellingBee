@@ -1,0 +1,37 @@
+name: Lint and Validate
+on: [push, pull_request]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check JSON validity
+        # Validates wordlist.json specifically
+        run: jq . wordlist.json > /dev/null
+
+      - name: Run Ruff lint
+        uses: astral-sh/ruff-action@v3
+        with:
+          version: "latest"
+          args: "check --output-format=github"
+
+      - name: Run Ruff Format
+        uses: astral-sh/ruff-action@v3
+        with:
+          version: "latest"
+          args: "format --check --respect-gitignore"
+
+      - name: Check audio coverage
+        run: |
+          pip install mutagen
+          python tests/check_audio.py

@@ -1,0 +1,61 @@
+{# Leaderboard fragment #}
+<header class="section-header">
+  <h2>{{ players | length }} tracked players</h2>
+  <button type="button" class="outline secondary" @click="mainMenu()">Main Menu</button>
+</header>
+
+{% macro sort_th(col, label, cls='') %}
+  <th class="lb-sort-header {{ cls }} {% if sort == col %}lb-sort-active{% endif %}"
+      aria-sort="{{ 'descending' if sort == col else 'none' }}">
+    <button type="button" class="sort-btn"
+            @click="location.hash = 'leaderboard/{{ col }}'">
+      {{ label }}{% if sort == col %} ↓{% endif %}
+    </button>
+  </th>
+{% endmacro %}
+
+{% if players | length > 0 %}
+  <figure>
+    <table>
+      <caption class="sr-only">Player leaderboard, sorted by {{ sort }}</caption>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          {{ sort_th('elo', 'ELO') }}
+          {{ sort_th('games', 'Games', 'lb-hide') }}
+          {{ sort_th('wins', 'Wins') }}
+          {{ sort_th('correct', 'Correct', 'lb-hide') }}
+          {{ sort_th('best_wpm', 'Best WPM', 'lb-hide') }}
+          {{ sort_th('best_streak', 'Streak') }}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in players %}
+          <tr class="lb-row" style="--row-color:{{ p.username | name_color }}">
+            <td>{{ loop.index }}</td>
+            <td>
+              <a class="plain-btn" href="#account/{{ p.username }}">
+                <strong>{{ p.username }}</strong>
+              </a>
+            </td>
+            <td>{{ p.elo | round(1) }}</td>
+            <td class="lb-hide">{{ p.games }}</td>
+            <td>
+              {{ p.wins }} <span class="lb-sub">({{ ((p.wins / p.games * 100) if p.games > 0 else 0) | round(1) }}%)</span>
+            </td>
+            <td class="lb-hide">
+              {{ p.correct }} <span class="lb-sub">({{ ((p.correct / p.words * 100) if p.words > 0 else 0) | round(1) }}%)</span>
+            </td>
+            <td class="lb-hide" title="{{ p.best_word }}">{{ p.best_wpm }}</td>
+            <td>{{ p.best_streak }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </figure>
+{% else %}
+  <p class="text-center">
+    <small>No players yet. Register and play to appear here!</small>
+  </p>
+{% endif %}

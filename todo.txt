@@ -1,0 +1,6 @@
+Ideas to implement
+- Delayed release words
+
+Cancelled
+- Add account avatars
+- Add replay/share links for strong performances.

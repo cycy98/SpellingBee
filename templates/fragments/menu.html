@@ -1,0 +1,42 @@
+{# Auth + setup fragment — returned after login/logout/register/set-password #}
+{% if user %}
+  <article id="auth-section"
+           x-data="{ changingPw: {{ 'true' if pw_error else 'false' }} }"
+           x-init="loggedInUser = '{{ user }}'; if (nameTracksLogin) playerName = '{{ user }}'; $nextTick(() => document.getElementById('auth-popover')?.hidePopover())">
+    <header class="section-header">
+      <strong class="amber">{{ user }}{% if elo is defined and elo is not none %} | {{ elo | round(1) }} ELO{% endif %}</strong>
+      <button class="secondary small" @click="changingPw = !changingPw" x-text="changingPw ? 'Cancel' : 'Change password'"></button>
+      <button class="secondary small" hx-post="logout" hx-target="#auth-section" hx-swap="outerHTML">Logout</button>
+    </header>
+    <form x-show="changingPw"
+          hx-post="set-password"
+          hx-target="#auth-section"
+          hx-swap="outerHTML">
+      <label for="current-password">Current password</label>
+      <input type="password" name="old_password" minlength="8" maxlength="128" id="current-password" autocomplete="current-password" pattern=".{8,128}" title="8–128 characters" {% if pw_error %}aria-describedby="pw-error" aria-invalid="true"{% endif %} required />
+      <label for="change-password">New password</label>
+      <input type="password" name="password" minlength="8" maxlength="128" id="change-password" autocomplete="new-password" pattern=".{8,128}" title="8–128 characters" required />
+      <button type="submit">Set password</button>
+      {% if pw_error %}<p id="pw-error" class="error">{{ pw_error }}</p>{% endif %}
+    </form>
+  </article>
+{% else %}
+  <form id="auth-section"
+        hx-post="login"
+        hx-include="#auth-username, #auth-password"
+        hx-target="this"
+        hx-swap="outerHTML"
+        x-init="loggedInUser = ''">
+    <label for="auth-username">Username</label>
+    <input type="text" name="username" minlength="3" maxlength="24" id="auth-username" autocomplete="username" pattern="[A-Za-z0-9_]{3,24}" title="3–24 characters: letters, numbers, underscores" aria-describedby="auth-feedback" {% if auth_error %}aria-invalid="true"{% endif %} required />
+    <label for="auth-password">Password</label>
+    <input type="password" name="password" minlength="8" maxlength="128" id="auth-password" autocomplete="current-password" required />
+    <div role="group">
+      <button type="submit">Login</button>
+      <button type="button" class="secondary" hx-post="register" hx-include="#auth-username, #auth-password">Register</button>
+    </div>
+    <div id="auth-feedback">
+      {% if auth_error %}<p class="error">{{ auth_error }}</p>{% endif %}
+    </div>
+  </form>
+{% endif %}

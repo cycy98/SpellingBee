@@ -1,0 +1,434 @@
+/* ── Pico Overrides & Variables ─── */
+
+:root {
+    --bg-secondary: #1a2340;
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --amber: #ffbf00;
+    --green: #22c55e;
+    --red: #ef4444;
+
+    --pico-background-color: #0f1729;
+    --pico-card-background-color: var(--glass);
+    --pico-card-border-color: var(--glass-border);
+    --pico-border-radius: 12px;
+    --pico-form-element-background-color: var(--glass);
+    --pico-form-element-border-color: var(--glass-border);
+    --pico-form-element-color: var(--pico-color);
+    --pico-form-element-placeholder-color: var(--pico-secondary);
+    --pico-form-element-focus-color: var(--amber);
+    --pico-card-sectioning-background-color: transparent;
+    --pico-h1-color: var(--amber);
+    --pico-h2-color: var(--amber);
+    --pico-h3-color: var(--amber);
+    --pico-block-spacing-vertical: 0.75rem;
+}
+
+body {
+    background-image: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--amber) 8%, transparent) 0%, transparent 60%);
+    font-family: 'Trebuchet MS', 'Lucida Sans', sans-serif;
+}
+
+h1, h2, h3 { text-wrap: balance; }
+h1 { text-shadow: 0 0 40px color-mix(in srgb, var(--amber) 30%, transparent); }
+[type="range"] { accent-color: var(--amber); }
+
+article {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Section Header ─ */
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: var(--pico-spacing);
+}
+
+.section-header > h1,
+.section-header > h2,
+.section-header > hgroup { margin: 0; }
+
+.pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: var(--pico-block-spacing-vertical);
+}
+
+/* ── App Shell & Game Layout ─ */
+
+main.container { container-type: inline-size; }
+
+nav {
+    border-bottom: 1px solid var(--glass-border);
+    margin-bottom: 16px;
+    --pico-nav-element-spacing-vertical: 0.4rem;
+}
+
+.nav-icon-btn { min-width: 2.4rem; }
+
+nav input[type="range"] {
+    display: inline-block;
+    width: clamp(80px, 10vw, 140px);
+    margin: 0;
+}
+
+@container (max-width: 480px) {
+    .audio-volume { display: none; }
+}
+
+.game-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 16px;
+    @container (max-width: 720px) { grid-template-columns: 1fr; }
+}
+
+.game-layout > * { min-width: 0; }
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.sidebar {
+    max-height: min(600px, 60svh);
+    display: flex;
+    flex-direction: column;
+}
+
+@container (max-width: 720px) {
+    .sidebar { max-height: none; }
+}
+
+.sidebar kbd { font-size: 0.7rem; }
+
+.chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.chat-msg {
+    margin: 0;
+    padding: 4px 0;
+    word-break: break-word;
+}
+
+/* ── Board & Glow ─── */
+
+[data-board] > button { margin-top: calc(var(--pico-block-spacing-vertical) * 0.67); }
+[data-board] > p { margin-top: calc(var(--pico-block-spacing-vertical) * 0.67); margin-bottom: 0; }
+
+.board-input {
+    padding: 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 1.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--amber);
+    background: var(--bg-secondary);
+    border: 2px solid var(--glass-border);
+
+    &:focus { border-color: var(--amber); }
+    &.watcher { opacity: 0.5; resize: none; min-height: 56px; pointer-events: none; }
+    &::placeholder {
+        color: var(--pico-secondary);
+        text-transform: none;
+        letter-spacing: normal;
+        font-size: 1rem;
+    }
+}
+
+.board-correct .board-input { animation: greenGlow 680ms ease; border-color: var(--green); }
+.board-incorrect .board-input { animation: redGlow 680ms ease; border-color: var(--red); }
+.board-correct { animation: boardFadeNext 680ms ease; }
+
+@keyframes greenGlow {
+    0%, 100% { box-shadow: 0 0 20px color-mix(in srgb, var(--green) 40%, transparent); }
+    50% { box-shadow: 0 0 40px color-mix(in srgb, var(--green) 40%, transparent); }
+}
+
+@keyframes redGlow {
+    0%, 100% { box-shadow: 0 0 20px color-mix(in srgb, var(--red) 40%, transparent); }
+    50% { box-shadow: 0 0 40px color-mix(in srgb, var(--red) 40%, transparent); }
+}
+
+/* ── Timer ─── */
+
+.timer-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--pico-muted-color);
+    margin-bottom: 4px;
+}
+
+.timer-warn { --pico-progress-color: #eab308; }
+.timer-danger { --pico-progress-color: var(--red); }
+.timer-ok { --pico-progress-color: var(--green); }
+
+/* ── Tier Colors ─ */
+
+kbd[data-tier] {
+    background: var(--tier-color, var(--amber));
+    color: #1a1a2e;
+    border-color: transparent;
+}
+
+/* ── Utilities ─── */
+
+.small { padding: 6px 12px; font-size: 0.85rem; }
+.mb { margin-bottom: var(--pico-block-spacing-vertical); }
+.error { color: var(--red); }
+.correct { color: var(--green); }
+.missed { color: var(--red); }
+.highlighted { background: color-mix(in srgb, var(--amber) 10%, transparent); }
+.eliminated { opacity: 0.4; }
+.text-center { text-align: center; }
+.amber { color: var(--amber); }
+.ms-auto { margin-left: auto; }
+.streak-hot { color: color-mix(in srgb, var(--amber) 70%, var(--red)); }
+
+.chat-messages { overflow-y: auto; overscroll-behavior: contain; flex: 1; margin-bottom: 8px; }
+.players-scroll { overflow-y: auto; overscroll-behavior: contain; flex: 1; }
+
+/* ── Feedback Colors  */
+
+.feedback-success { --feedback-color: var(--green); }
+.feedback-error   { --feedback-color: var(--red); }
+.feedback-info    { --feedback-color: var(--amber); }
+.feedback-border  { border-left: 4px solid var(--feedback-color); }
+.feedback-text    { color: var(--feedback-color); }
+
+/* ── Stats & Badges ─ */
+
+.stats-table td + td,
+.stat-card td + td { text-align: right; font-weight: 600; }
+
+.badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+
+.stat-card { font-size: 0.85rem; margin-bottom: 0; }
+.stat-card caption { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--pico-muted-color); padding: 0 0 8px; caption-side: top; }
+.stat-card td { padding: 3px 0; border: none; }
+.stat-card progress { margin: 0; }
+
+/* ── Listening chip ─── */
+
+.listening-chip {
+    display: inline-block;
+    margin-bottom: 8px;
+    background: color-mix(in srgb, var(--amber) 20%, transparent);
+    color: var(--amber);
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+}
+
+/* ── Room code display ── */
+
+.room-code-chip { font-size: 1.2rem; letter-spacing: 0.2em; }
+
+/* ── Guess submitting pulse ─── */
+
+.board-submitting { animation: boardPulse 0.5s ease-in-out infinite; }
+@keyframes boardPulse { 50% { opacity: 0.55; } }
+
+@keyframes boardFadeNext { 50% { opacity: 0.45; } 100% { opacity: 1; } }
+
+/* ── SSE refresh signal (spectator sees morph incoming) ─── */
+
+.room-refreshing { opacity: 0.7; transition: opacity 0.15s ease; pointer-events: none; }
+
+/* ── Chat timestamps ─── */
+
+.chat-ts {
+    float: right;
+    font-size: 0.7rem;
+    opacity: 0.5;
+    margin-left: 6px;
+}
+
+/* ── Toast ─── */
+
+[x-cloak] { display: none !important; }
+
+.toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 240px;
+    max-width: min(480px, 90vw);
+    cursor: pointer;
+    z-index: 1000;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+/* ── View Transitions ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 160ms;
+}
+
+
+/* ── Auth Popover ─── */
+
+#auth-popover,
+#ios-install-guide {
+    background: transparent;
+    border: none;
+}
+
+#auth-popover::backdrop,
+#ios-install-guide::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+#ios-install-guide { max-width: min(400px, 90vw); }
+
+/* ── PWA standalone safe-area insets (notch / home indicator) ─── */
+
+@media (display-mode: standalone) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-right: env(safe-area-inset-right);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+    }
+}
+
+/* ── Mode Grid ─── */
+
+.mode-grid button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 12px;
+    height: 100%;
+    min-height: 72px;
+}
+
+.mode-grid button span {
+    opacity: 0.7;
+    line-height: 1.3;
+    text-align: center;
+    white-space: normal;
+}
+
+/* ── Pass & Play Roster ─── */
+
+.player-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.player-row input { flex: 1; margin: 0; }
+
+.player-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.25s;
+}
+
+.activity-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    vertical-align: middle;
+    animation: activityPulse 2s ease-in-out infinite;
+}
+
+@keyframes activityPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ── Leaderboard ─── */
+
+.lb-sort-header { cursor: pointer; user-select: none; white-space: nowrap; }
+.lb-sort-header:hover { text-decoration: underline; }
+.lb-sort-active { color: var(--pico-primary); }
+.lb-sub { font-size: 0.75em; opacity: 0.6; }
+@container (max-width: 600px) { .lb-hide { display: none; } }
+.lb-row { border-left: 3px solid var(--row-color); }
+
+/* ── Utility additions ─── */
+
+.text-right { text-align: right; }
+.pt-0 { padding-top: 0 !important; }
+.compact-cell { padding: 0 4px; }
+.m-0 { margin: 0; }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Unstyled button — leaderboard player links and sort-column headers */
+.plain-btn,
+.sort-btn {
+    all: unset;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    display: inline;
+}
+
+.plain-btn:hover,
+.sort-btn:hover { text-decoration: underline; }
+
+.plain-btn:focus-visible,
+.sort-btn:focus-visible { outline: 2px solid var(--pico-primary); outline-offset: 2px; border-radius: 2px; }
+
+/* ── Stats view ─── */
+
+.kpi-delta-up   { color: var(--green); }
+.kpi-delta-down { color: var(--red); }
+
+.heatmap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: var(--pico-block-spacing-vertical);
+}
+.heatmap-cell {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--pico-muted-border-color);
+}
+.heatmap-cell[data-level="1"] { background: color-mix(in srgb, var(--amber) 35%, transparent); }
+.heatmap-cell[data-level="2"] { background: color-mix(in srgb, var(--amber) 60%, transparent); }
+.heatmap-cell[data-level="3"] { background: var(--amber); }
+.heatmap-cell[data-today]     { outline: 1px solid var(--pico-color); outline-offset: 1px; }
+
+.chart-wrap { overflow: hidden; }
+
+/* uPlot dark-theme overrides */
+.uplot text          { fill: #a0aec0; }
+.u-legend            { font-size: 0.75rem; color: #a0aec0; }
+.u-legend .u-marker  { width: 10px; height: 3px; border-radius: 2px; }

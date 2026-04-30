@@ -1,0 +1,54 @@
+[project]
+name = "spellingbee"
+version = "0.7.0"
+description = "Spelling bee"
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "argon2-cffi>=25.1.0",
+    "discord-py>=2.7.1",
+    "fastapi[standard]>=0.135.3",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.26",
+    "sse-starlette>=3.3.4",
+]
+
+[project.optional-dependencies]
+audio = ["mutagen>=1.47"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+# Require explicit selection of preview rules.
+explicit-preview-rules = true
+select = ["ALL"]
+extend-select = ["ALL"]
+extend-safe-fixes = ["ALL"]
+extend-ignore = ["D", "N", "ANN", "T201", "PLR2004", "FBT001", "FBT002", "C901", "PLR0913", "PLR0912", "EXE001"]
+preview = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"bench_argon2.py" = ["S105", "ERA001"]
+
+[tool.djlint]
+profile = "jinja"
+max_line_length = 120
+max_attribute_length = 120
+indent = 2
+use_gitignore = true
+close_void_tags = true
+format_attribute_template_tags = true
+line_break_after_multiline_tag = false
+max_blank_lines = 1
+ignore = "H014,H021,H030,H031,J004,T028"
+
+[dependency-groups]
+dev = [
+    "djlint>=1.36.4",
+]

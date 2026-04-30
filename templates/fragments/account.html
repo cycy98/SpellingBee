@@ -1,0 +1,389 @@
+{# Account fragment #}
+<div>
+  <header class="section-header">
+    <hgroup>
+      <h2>{{ player.username }}</h2>
+      <p>
+        {{ player.elo | round(1) }} ELO
+        {% if rank %} · #{{ rank.rank }} of {{ rank.total }}{% endif %}
+        {% if member_since %} · member since {{ member_since | relative_time }}{% endif %}
+      </p>
+    </hgroup>
+    <nav aria-label="Account navigation">
+      <div role="group">
+        <button type="button" class="outline secondary" @click="location.hash = 'leaderboard'">Leaderboard</button>
+        <button type="button" class="outline secondary" @click="mainMenu()">Main Menu</button>
+      </div>
+    </nav>
+  </header>
+
+  {% if badges or earned_tiers %}
+    <div class="badge-row">
+      {% for name, icon in badges %}<kbd>{{ icon }} {{ name }}</kbd>{% endfor %}
+      {% for t in earned_tiers %}<kbd data-tier="{{ t }}">{{ t | capitalize }}</kbd>{% endfor %}
+    </div>
+  {% endif %}
+
+  {# ── Activity heatmap ── #}
+  <div class="heatmap">
+    {% for d in heatmap_days %}
+      <div class="heatmap-cell"
+           data-level="{{ d.level }}"
+           {% if d.today %}data-today{% endif %}
+           title="{{ d.date }}: {{ d.n }} guess{{ 'es' if d.n != 1 else '' }}"></div>
+    {% endfor %}
+  </div>
+  {% if hot_streak >= 3 %}
+    <p class="streak-hot" style="margin-top:-8px;">🔥 {{ hot_streak }} correct in a row</p>
+  {% endif %}
+
+  <article>
+    <figure>
+    <table class="stats-table">
+      <caption class="sr-only">Player statistics for {{ player.username }}</caption>
+      <tbody>
+        <tr>
+          <td><strong>Games Played</strong></td>
+          <td>{{ player.games }}</td>
+        </tr>
+        <tr>
+          <td><strong>Wins</strong></td>
+          <td>
+            {{ player.wins }}
+            {% if player.games > 0 %}
+              <small>({{ ((player.wins / player.games * 100)) | round(1) }}%)</small>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Words Attempted</strong></td>
+          <td>{{ player.words }}</td>
+        </tr>
+        <tr>
+          <td><strong>Correct Words</strong></td>
+          <td>
+            {{ player.correct }}
+            {% if player.words > 0 %}
+              <small>({{ ((player.correct / player.words * 100)) | round(1) }}%)</small>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Best Streak</strong></td>
+          <td>{{ player.best_streak }}</td>
+        </tr>
+        <tr>
+          <td><strong>Highest WPM</strong></td>
+          <td>
+            {{ player.best_wpm }}
+            {% if player.best_word %}<small>({{ player.best_word }})</small>{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Avg WPM (recent)</strong></td>
+          <td>{{ avg_wpm }}</td>
+        </tr>
+      </tbody>
+    </table>
+    </figure>
+  </article>
+
+  {# ── ELO chart ── #}
+  <article>
+    <header style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+      <strong>
+        ELO History
+        {% if rank and rank.elo_7d_ago is not none %}
+          {% set delta = (rank.elo - rank.elo_7d_ago) | round(1) %}
+          <small class="{% if delta >= 0 %}kpi-delta-up{% else %}kpi-delta-down{% endif %}">
+            &thinsp;{% if delta >= 0 %}+{% endif %}{{ delta }} this week
+          </small>
+        {% endif %}
+      </strong>
+      {% if elo_ts %}
+        <div role="group" style="margin:0;">
+          <button type="button" class="outline secondary small" data-range="1M" aria-pressed="false" onclick="_eloRange('1M')">1M</button>
+          <button type="button" class="outline secondary small" data-range="3M" aria-pressed="false" onclick="_eloRange('3M')">3M</button>
+          <button type="button" class="outline secondary small" data-range="All" aria-pressed="true" onclick="_eloRange('All')">All</button>
+        </div>
+      {% endif %}
+    </header>
+    {% if elo_ts %}
+      <div id="elo-chart-wrap" class="chart-wrap">
+        <div id="elo-chart"></div>
+      </div>
+    {% else %}
+      <p><small>Play some ranked matches to see your ELO history.</small></p>
+    {% endif %}
+  </article>
+
+  {# ── WPM trend chart ── #}
+  {% if wpm_ts %}
+    <article>
+      <header><strong>WPM History</strong></header>
+      <div id="wpm-chart-wrap" class="chart-wrap">
+        <div id="wpm-chart"></div>
+      </div>
+    </article>
+  {% endif %}
+
+  {# ── Tier accuracy ── #}
+  {% if tiers %}
+    <article>
+      <header><strong>Accuracy by Tier</strong></header>
+      <figure>
+        <table>
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>Attempts</th>
+              <th>Accuracy</th>
+              <th>Best WPM</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tiers %}
+              <tr>
+                <td><kbd data-tier="{{ t.tier }}">{{ t.tier | capitalize }}</kbd></td>
+                <td>{{ t.attempts }}</td>
+                <td style="min-width:140px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <progress value="{{ t.accuracy }}" max="100" style="flex:1; margin:0;"></progress>
+                    <small style="white-space:nowrap;">{{ t.accuracy | round(1) }}%</small>
+                  </div>
+                </td>
+                <td>{{ t.best_wpm | round(0) | int if t.best_wpm else '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </figure>
+    </article>
+  {% endif %}
+
+  {% if practice %}
+    <h3>Words to Practice</h3>
+    <figure>
+      <table>
+        <thead>
+          <tr>
+            <th>Word</th>
+            <th>Times Missed</th>
+            <th>Definition</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in practice %}
+            <tr>
+              <td>{{ p.word }}</td>
+              <td>{{ p.n }}</td>
+              <td><small>{{ p.definition or '—' }}</small></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </figure>
+  {% endif %}
+
+  {% if recent %}
+    <h3>Recent Activity</h3>
+    <figure>
+      <table>
+        <thead>
+          <tr>
+            <th>Word</th>
+            <th>Result</th>
+            <th>WPM</th>
+            <th>Tier</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent %}
+            <tr>
+              <td>{{ r.word }}</td>
+              <td>
+                {% if r.correct %}
+                  <span class="correct">Correct</span>
+                {% else %}
+                  <span class="missed">Missed</span>
+                {% endif %}
+              </td>
+              <td>{{ (r.wpm | round(1)) if r.wpm is not none else "—" }}</td>
+              <td>{{ r.tier | capitalize }}</td>
+              <td><small>{{ r.ts | relative_time }}</small></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </figure>
+  {% endif %}
+
+  {% if is_admin and user != player.username %}
+    <h3>Admin</h3>
+    <article>
+      <form hx-post="admin/user/{{ player.username }}/edit" hx-target="#content" hx-swap="innerHTML">
+        <div class="grid">
+          <label>ELO<input type="number" step="0.1" name="elo" value="{{ player.elo | round(1) }}" min="0" max="9999" required></label>
+          <label>Games<input type="number" name="games" value="{{ player.games }}" min="0" max="99999" required></label>
+          <label>Wins<input type="number" name="wins" value="{{ player.wins }}" min="0" max="99999" required></label>
+          <label>Words<input type="number" name="words" value="{{ player.words }}" min="0" max="999999" required></label>
+          <label>Correct<input type="number" name="correct" value="{{ player.correct }}" min="0" max="999999" required></label>
+          <label>Best WPM<input type="number" name="best_wpm" value="{{ player.best_wpm }}" min="0" max="9999" required></label>
+          <label>Best Streak<input type="number" name="best_streak" value="{{ player.best_streak }}" min="0" max="9999" required></label>
+          <label>Best Word<input type="text" name="best_word" value="{{ player.best_word }}"></label>
+        </div>
+        <button type="submit">Save Changes</button>
+      </form>
+      <hr>
+      <button class="secondary"
+              hx-post="admin/user/{{ player.username }}/delete"
+              hx-target="#content"
+              hx-swap="innerHTML"
+              hx-confirm="Permanently delete {{ player.username }}? This cannot be undone.">
+        Delete User
+      </button>
+    </article>
+  {% endif %}
+
+  {% if user == player.username %}
+    <h3>Appearance</h3>
+    <article>
+      <form hx-post="account/settings" hx-swap="none">
+        <label for="theme-select">Color theme (restart required)</label>
+        <div role="group">
+          <select id="theme-select" name="theme">
+            {% for t in pico_themes %}
+              <option value="{{ t }}"{% if t == player.theme %} selected{% endif %}>{{ t | capitalize }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Save</button>
+        </div>
+      </form>
+    </article>
+
+    <h3>Integrations</h3>
+    <article>
+      {% if discord_id %}
+        <a href="https://discord.com/oauth2/authorize?client_id={{ discord_id }}">
+          <button type="button">Add to Discord</button>
+        </a>
+      {% endif %}
+      <p><small>To link your Discord account, run <code>/account link {{ player.username }} {{ discord_link_code }}</code> in Discord. The code refreshes every 10 minutes.</small></p>
+    </article>
+  {% endif %}
+</div>
+
+{% if elo_ts %}
+<script>
+(function () {
+  const allTs  = Float64Array.from({{ elo_ts | tojson }});
+  const allElo = Float64Array.from({{ elo_vals | tojson }});
+  let _chart = null, _range = 'All';
+
+  const axisStyle = {
+    stroke: '#718096',
+    grid:   { stroke: '#2d3748', width: 1 },
+    ticks:  { stroke: '#4a5568', size: 4 },
+  };
+
+  function buildOpts(w) {
+    return {
+      width:  w,
+      height: 200,
+      series: [
+        {},
+        { label: 'ELO',  stroke: 'var(--amber)',           width: 2, spanGaps: true },
+        { label: '1000', stroke: 'rgba(255,255,255,0.15)', width: 1, dash: [4, 4] },
+      ],
+      axes: [
+        { ...axisStyle },
+        { ...axisStyle, size: 55 },
+      ],
+      scales: { x: { time: true } },
+      padding: [10, 12, 0, 0],
+      legend: { show: false },
+    };
+  }
+
+  function filter(range) {
+    if (range === 'All') return [allTs, allElo];
+    const cutoff = Date.now() / 1000 - (range === '1M' ? 30 : 90) * 86400;
+    const ts = [], elo = [];
+    for (let i = 0; i < allTs.length; i++) {
+      if (allTs[i] >= cutoff) { ts.push(allTs[i]); elo.push(allElo[i]); }
+    }
+    return [new Float64Array(ts), new Float64Array(elo)];
+  }
+
+  function draw(range) {
+    _range = range;
+    const wrap = document.getElementById('elo-chart-wrap');
+    const el   = document.getElementById('elo-chart');
+    if (!wrap || !el) return;
+    const [ts, elo] = filter(range);
+    const base = Float64Array.from(ts, () => 1000);
+    if (_chart) { _chart.destroy(); _chart = null; }
+    _chart = new uPlot(buildOpts(wrap.clientWidth - 2), [ts, elo, base], el);
+    wrap.querySelectorAll('[data-range]').forEach(b =>
+      b.setAttribute('aria-pressed', b.dataset.range === range ? 'true' : 'false')
+    );
+  }
+
+  window._eloRange = draw;
+  draw('All');
+
+  new ResizeObserver(() => draw(_range))
+    .observe(document.getElementById('elo-chart-wrap'));
+})();
+</script>
+{% endif %}
+
+{% if wpm_ts %}
+<script>
+(function () {
+  const allTs  = Float64Array.from({{ wpm_ts | tojson }});
+  const allWpm = Float64Array.from({{ wpm_vals | tojson }});
+  const avgWpm = Float64Array.from(allWpm, (_, i) => {
+    const start = Math.max(0, i - 9);
+    let sum = 0;
+    for (let j = start; j <= i; j++) sum += allWpm[j];
+    return sum / (i - start + 1);
+  });
+
+  const axisStyle = {
+    stroke: '#718096',
+    grid:   { stroke: '#2d3748', width: 1 },
+    ticks:  { stroke: '#4a5568', size: 4 },
+  };
+
+  let _chart = null;
+
+  function draw() {
+    const wrap = document.getElementById('wpm-chart-wrap');
+    const el   = document.getElementById('wpm-chart');
+    if (!wrap || !el) return;
+    if (_chart) { _chart.destroy(); _chart = null; }
+    _chart = new uPlot({
+      width:  wrap.clientWidth - 2,
+      height: 180,
+      series: [
+        {},
+        { label: 'WPM',     stroke: 'rgba(255,191,0,0.25)', width: 1, spanGaps: true },
+        { label: 'Avg WPM', stroke: 'var(--amber)',          width: 2, spanGaps: true },
+      ],
+      axes: [
+        { ...axisStyle },
+        { ...axisStyle, size: 55 },
+      ],
+      scales: { x: { time: true } },
+      padding: [10, 12, 0, 0],
+      legend: { show: false },
+    }, [allTs, allWpm, avgWpm], el);
+  }
+
+  draw();
+  new ResizeObserver(draw).observe(document.getElementById('wpm-chart-wrap'));
+})();
+</script>
+{% endif %}

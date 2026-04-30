@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html
+  data-theme="dark"
+  lang="en"
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <title>{% block title %}Spelling Bee{% endblock title %}</title>
+    <base href="{{ request.scope.get('root_path', '').rstrip('/') }}/" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.{{ pico_theme }}.min.css" />
+    <link rel="stylesheet" href="static/styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.iife.min.js" defer></script>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="static/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0f1729" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Spelling Bee" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="description" content="Multiplayer spelling bee game — solo, local, lobby, and ranked modes." />
+    <style>
+    {% for tier, color in tier_colors.items() %}
+    [data-tier="{{ tier }}"] { --tier-color: {{ color }}; }
+    {% endfor %}
+    </style>
+    <script src="https://unpkg.com/htmx.org@2.0.8/dist/htmx.min.js"
+            integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz"
+            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.4/sse.js"
+            integrity="sha384-QA9wXqexhwzXTuTvuF5QP82pddm3R2hy81UzXi7ioNTqNF2b75hlkkSGjafohhL3"
+            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/idiomorph@0.7.4/dist/idiomorph-ext.min.js"
+            integrity="sha384-SsScJKzATF/w6suEEdLbgYGsYFLzeKfOA6PY+/C5ZPxOSuA+ARquqtz/BZz9JWU8"
+            crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leo-profanity@1.9.0/src/index.js"
+            integrity="sha384-K739sy+lfaRbDbvyilsFMTguywMXHMt9c/SUU4oAQ35RmjUDh9u88x4F49hDU2ZA"
+            crossorigin="anonymous"
+            async></script>
+    <script defer
+            src="https://unpkg.com/alpinejs@3.15.11/dist/cdn.min.js"
+            integrity="sha384-WPtu0YHhJ3arcykfnv1JgUffWDSKRnqnDeTpJUbOc2os2moEmLkIdaeR0trPN4be"
+            crossorigin="anonymous"></script>
+  </head>
+  <body>
+    <main x-data="spellingBee()" class="container" hx-ext="morph">
+      {% block content %}
+      {% endblock content %}
+      <article x-cloak
+               x-show="toastMsg"
+               x-transition
+               class="toast feedback-border"
+           :class="`feedback-${toastType}`"
+           role="alert"
+           aria-live="assertive"
+           @click="toastMsg = ''; clearTimeout(toastTimer)"
+           x-text="toastMsg"></article>
+    </main>
+    <script>
+    /* aria-busy loading indicators on HTMX buttons (Pico renders a spinner) */
+    document.addEventListener('htmx:beforeRequest', (e) => {
+        if (e.detail.elt.tagName === 'BUTTON') e.detail.elt.setAttribute('aria-busy', 'true');
+    });
+    document.addEventListener('htmx:afterRequest', (e) => {
+        if (e.detail.elt.tagName === 'BUTTON') e.detail.elt.removeAttribute('aria-busy');
+    });
+
+    /* Profanity filter — gate HTMX requests that carry user-entered names */
+    document.addEventListener('htmx:configRequest', (e) => {
+        const check = window.LeoProfanity?.check;
+        if (!check) return;
+        const params = e.detail.parameters;
+        const fields = [
+            ['username', 'username'], ['player_name', 'player name'], ['message', 'message'],
+        ];
+        for (const [key, label] of fields) {
+            if (params[key] && check.call(window.LeoProfanity, params[key])) {
+                e.preventDefault();
+                const app = Alpine.$data(document.querySelector('[x-data]'));
+                if (app) { app.profanityError = `Please choose a different ${label}.`; }
+                return;
+            }
+        }
+    });
+
+    /* Capture ready-count before idiomorph overwrites it */
+    document.addEventListener('htmx:beforeSwap', (e) => {
+        const btn = e.detail.target?.querySelector?.('[data-ready-count]');
+        if (btn) e.detail.target._prevReadyCount = parseInt(btn.dataset.readyCount, 10);
+    });
+
+    /* Board glow + submitting state — triggered only by guess POST response */
+    document.addEventListener('htmx:afterSwap', (e) => {
+        const app = Alpine.$data(document.querySelector('[x-data]'));
+        if (app) { app.submitting = false; app._guessAc?.abort(); }
+
+        /* Rematch vote toast — compare count saved before swap */
+        const prev = e.detail.target?._prevReadyCount;
+        const nextBtn = e.detail.target?.querySelector?.('[data-ready-count]');
+        if (nextBtn && prev !== undefined) {
+            const next = parseInt(nextBtn.dataset.readyCount, 10);
+            if (!isNaN(prev) && !isNaN(next) && next > prev && app) {
+                app.showToast('A player voted to rematch!', 'info');
+            }
+        }
+
+        if (!e.detail.requestConfig?.path?.includes('guess')) return;
+        const board = document.querySelector('[data-board]');
+        if (!board) return;
+        const cls = board.dataset.feedback === 'success'
+            ? 'board-correct' : 'board-incorrect';
+        board.classList.remove('board-correct', 'board-incorrect');
+        board.classList.add(cls);
+        board.addEventListener('animationend', () => board.classList.remove(cls), { once: true });
+    });
+
+    function spellingBee() {
+        return {
+            roomCode: null,
+            playerName: localStorage.getItem('sbPlayerName') || '',
+            difficulty: localStorage.getItem('sbDifficulty') || '{{ difficulties[0] }}',
+            roomCodeInput: '',
+            localPlayers: JSON.parse(localStorage.getItem('sbLocalPlayers') || '["",""]'),
+            audioObj: null,
+            audioPlayedUrl: '',
+            lastWordKey: '',
+            audioEndedAt: 0,
+            inputLocked: false,
+            submitting: false,
+            _guessAc: null,
+            autoplayBlocked: false,
+            nameTracksLogin: true,
+            loggedInUser: '',
+
+            volume: parseFloat(localStorage.getItem('sbVolume') ?? '1'),
+            muted: localStorage.getItem('sbMuted') === 'true',
+            profanityError: '',
+            toastMsg: '',
+            toastType: 'error',
+            toastTimer: null,
+
+            online: navigator.onLine,
+            canInstall: false,
+            _installPrompt: null,
+            isStandalone: window.matchMedia('(display-mode: standalone)').matches,
+            isIOS: /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream,
+            installDismissed: (() => { const t = localStorage.getItem('sbInstallSnoozed'); return !!(t && Date.now() - parseInt(t) < 7 * 864e5); })(),
+
+            // Persisted across room updates (room state morphs via SSE,
+            // which would wipe these if they lived in room.html's local x-data)
+            roomLocked: false,
+            guessText: '',
+            chatMsg: '',
+            sideTab: localStorage.getItem('sbSideTab') || 'players',
+            showPassPlay: localStorage.getItem('sbShowPassPlay') === 'true',
+
+            init() {
+                window.addEventListener('beforeunload', () => {
+                    if (this.roomCode) navigator.sendBeacon('forfeit');
+                });
+                window.addEventListener('htmx:sseMessage', (e) => {
+                    if (e.detail.type === 'close') this.mainMenu();
+                    if (e.detail.type === 'refresh') {
+                        const rs = document.getElementById('room-state');
+                        if (rs) {
+                            rs.classList.add('room-refreshing');
+                            setTimeout(() => rs.classList.remove('room-refreshing'), 300);
+                        }
+                    }
+                });
+                window.addEventListener('htmx:sseError', async () => {
+                    if (!this.roomCode) return;
+                    try {
+                        const r = await fetch(`room/${this.roomCode}`);
+                        if (r.status === 403 || r.status === 404) this.mainMenu();
+                    } catch (_) {}
+                });
+                window.addEventListener('auth-changed', (e) => {
+                    this.loggedInUser = e.detail?.user || '';
+                    if (e.detail?.user && this.nameTracksLogin) this.playerName = e.detail.user;
+                });
+                this.$watch('playerName', (val) => localStorage.setItem('sbPlayerName', val));
+                this.$watch('roomCode', (code) => { if (code) location.hash = `room/${code}`; });
+                this.$watch('volume', (val) => localStorage.setItem('sbVolume', val));
+                this.$watch('muted', (val) => localStorage.setItem('sbMuted', val));
+                this.$watch('difficulty', (val) => localStorage.setItem('sbDifficulty', val));
+                this.$watch('sideTab', (val) => localStorage.setItem('sbSideTab', val));
+                this.$watch('showPassPlay', (val) => localStorage.setItem('sbShowPassPlay', val));
+                this.$watch('localPlayers', (val) => localStorage.setItem('sbLocalPlayers', JSON.stringify(val)), { deep: true });
+                window.addEventListener('showToast', (e) => {
+                    this.showToast(e.detail?.message || '', e.detail?.type || 'error');
+                });
+                window.addEventListener('offline', () => { this.online = false; });
+                window.addEventListener('online', () => { this.online = true; });
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    this._installPrompt = e;
+                    this.canInstall = true;
+                });
+                window.addEventListener('appinstalled', () => { this.canInstall = false; localStorage.removeItem('sbInstallSnoozed'); });
+            },
+
+            showToast(msg, type = 'error') {
+                clearTimeout(this.toastTimer);
+                this.toastMsg = msg;
+                this.toastType = type;
+                this.toastTimer = setTimeout(() => { this.toastMsg = ''; }, 3500);
+            },
+
+            addLocalPlayer() {
+                if (this.localPlayers.length < 12) this.localPlayers.push('');
+            },
+
+            nameColor(name) {
+                if (!name) return 'var(--pico-muted-color)';
+                let h = 5381;
+                for (let i = 0; i < name.length; i++) h = ((h << 5) + h) ^ name.charCodeAt(i);
+                return `hsl(${(h >>> 0) % 360}, 65%, 55%)`;
+            },
+
+            playAudio(url, lock, duration) {
+                if (!url) {
+                    this.inputLocked = false;
+                    return;
+                }
+                if (this.audioObj) {
+                    this.audioObj.pause();
+                    this.audioObj = null;
+                }
+                speechSynthesis.cancel();
+                const speakFallback = (onDone) => {
+                    const word = url.split('/').pop().replace(/\.[^.]+$/, '');
+                    const utter = new SpeechSynthesisUtterance(word);
+                    utter.onend = onDone;
+                    utter.onerror = onDone;
+                    speechSynthesis.speak(utter);
+                };
+                this.audioPlayedUrl = url;
+                this.audioObj = new Audio(url);
+                this.audioObj.volume = this.muted ? 0 : this.volume;
+                const markEnded = () => {
+                    if (!this.audioEndedAt) this.audioEndedAt = performance.now();
+                };
+                if (lock) {
+                    this.inputLocked = true;
+                    let unlocked = false;
+                    const unlock = () => {
+                        if (!unlocked) { unlocked = true; markEnded(); this.inputLocked = false; }
+                    };
+                    const audio = this.audioObj;
+                    audio.addEventListener('ended', unlock);
+                    audio.addEventListener('error', () => speakFallback(unlock));
+                    audio.addEventListener('timeupdate', () => {
+                        if (audio.duration > 0.5 && audio.duration - audio.currentTime <= 0.5) unlock();
+                    });
+                    const fallback = duration ? (duration * 1000) + 500 : 5000;
+                    setTimeout(unlock, fallback);
+                } else {
+                    this.audioObj.addEventListener('ended', markEnded);
+                    this.audioObj.addEventListener('error', () => speakFallback(markEnded));
+                }
+                this.audioObj.play().catch(() => {
+                    this.inputLocked = false;
+                    this.autoplayBlocked = true;
+                    markEnded();
+                });
+            },
+
+            replayAudio() {
+                const url = document.querySelector('[data-audio-url]');
+                if (url && url.dataset.audioUrl) {
+                    this.playAudio(url.dataset.audioUrl, false, 0);
+                }
+            },
+
+            submitGuess(text) {
+                if (this.inputLocked) return;
+                text = text.replace(/[ \-]+$/, '');
+                this.inputLocked = true;
+                this.guessText = '';
+                if (!this.audioEndedAt) this.audioEndedAt = performance.now();
+                const typingMs = Math.max(0, Math.round(performance.now() - this.audioEndedAt));
+                this._guessAc?.abort();
+                const ac = new AbortController();
+                this._guessAc = ac;
+                const unlock = () => { this.inputLocked = false; this.submitting = false; ac.abort(); };
+                const onError = (e) => {
+                    const status = e.detail?.xhr?.status;
+                    const msg = status === 403 ? 'Session expired — please rejoin.' : 'Something went wrong, try again.';
+                    this.showToast(msg, 'error');
+                    unlock();
+                };
+                document.addEventListener('htmx:responseError', onError, { signal: ac.signal });
+                document.addEventListener('htmx:sendError', onError, { signal: ac.signal });
+                this.submitting = true;
+                htmx.ajax('POST', 'guess', {
+                    target: '#room-state',
+                    swap: 'morph:outerHTML',
+                    select: '#room-state',
+                    values: {
+                        guess: (text || '').replace(/[^A-Za-zæœÆŒéíō \-]/g, '').trim(),
+                        typing_ms: typingMs,
+                    }
+                });
+            },
+
+            sendChat(roomCode) {
+                if (!this.chatMsg.trim()) return;
+                if (this.checkProfanity(this.chatMsg, 'message')) return;
+                htmx.ajax('POST', `room/${roomCode}/chat`, {
+                    values: { message: this.chatMsg },
+                    swap: 'none'
+                });
+                this.chatMsg = '';
+            },
+
+            mainMenu() {
+                if (this.roomCode) navigator.sendBeacon('forfeit');
+                this.roomCode = null;
+                if (location.hash && location.hash !== '#') {
+                    location.hash = ''; // hashchange fires → sbNavigate
+                } else {
+                    sbNavigate('');
+                }
+            },
+
+            hasProfanity(text) {
+                return window.LeoProfanity?.check?.(text) ?? false;
+            },
+
+            checkProfanity(text, field) {
+                if (this.hasProfanity(text)) {
+                    this.profanityError = `Please choose a different ${field}.`;
+                    return true;
+                }
+                this.profanityError = '';
+                return false;
+            },
+        }
+    }
+    function sbNavigate(hash) {
+        const [page, ...args] = (hash || '').split('/').filter(Boolean);
+        const swap = {target: '#content', swap: 'innerHTML transition:true'};
+        switch (page) {
+            case 'leaderboard':
+                htmx.ajax('GET', `leaderboard?sort=${args[0] ?? 'elo'}`, swap); break;
+            case 'account': {
+                const user = args[0] || Alpine.$data(document.querySelector('[x-data]'))?.loggedInUser;
+                if (!args[0] && user) { location.hash = `account/${user}`; break; }
+                htmx.ajax('GET', `account${user ? '/' + user : ''}`, swap); break;
+            }
+            case 'stats': {
+                const user = args[0] || Alpine.$data(document.querySelector('[x-data]'))?.loggedInUser;
+                if (user) location.hash = `account/${user}`;
+                break;
+            }
+            case 'room':
+                if (args[0]) {
+                    const cur = Alpine.$data(document.querySelector('[x-data]'))?.roomCode;
+                    if (cur !== args[0]) htmx.ajax('GET', `room/${args[0]}`, swap);
+                }
+                break;
+            default:
+                htmx.ajax('GET', '', swap);
+        }
+    }
+    window.addEventListener('hashchange', () => sbNavigate(location.hash.slice(1)));
+    if (location.hash) sbNavigate(location.hash.slice(1));
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+    </script>
+  </body>
+</html>
