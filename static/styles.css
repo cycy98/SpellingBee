@@ -1,4 +1,4 @@
-/* ── Pico Overrides & Variables ─── */
+/* Pico Overrides & Variables */
 
 :root {
     --bg-secondary: #1a2340;
@@ -38,7 +38,7 @@ article {
     -webkit-backdrop-filter: blur(12px);
 }
 
-/* ── Section Header ─ */
+/* Section Header */
 
 .section-header {
     display: flex;
@@ -61,7 +61,7 @@ article {
     margin-bottom: var(--pico-block-spacing-vertical);
 }
 
-/* ── App Shell & Game Layout ─ */
+/* App Shell & Game Layout */
 
 main.container { container-type: inline-size; }
 
@@ -101,13 +101,15 @@ nav input[type="range"] {
 }
 
 .sidebar {
-    max-height: min(600px, 60svh);
+    height: min(600px, 60svh);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 @container (max-width: 720px) {
-    .sidebar { max-height: none; }
+    .sidebar { height: auto; overflow: visible; }
+    .chat-messages { max-height: 35svh; }
 }
 
 .sidebar kbd { font-size: 0.7rem; }
@@ -125,7 +127,7 @@ nav input[type="range"] {
     word-break: break-word;
 }
 
-/* ── Board & Glow ─── */
+/* Board & Glow */
 
 [data-board] > button { margin-top: calc(var(--pico-block-spacing-vertical) * 0.67); }
 [data-board] > p { margin-top: calc(var(--pico-block-spacing-vertical) * 0.67); margin-bottom: 0; }
@@ -164,7 +166,7 @@ nav input[type="range"] {
     50% { box-shadow: 0 0 40px color-mix(in srgb, var(--red) 40%, transparent); }
 }
 
-/* ── Timer ─── */
+/* Timer */
 
 .timer-info {
     display: flex;
@@ -178,7 +180,7 @@ nav input[type="range"] {
 .timer-danger { --pico-progress-color: var(--red); }
 .timer-ok { --pico-progress-color: var(--green); }
 
-/* ── Tier Colors ─ */
+/* Tier Colors */
 
 kbd[data-tier] {
     background: var(--tier-color, var(--amber));
@@ -186,7 +188,7 @@ kbd[data-tier] {
     border-color: transparent;
 }
 
-/* ── Utilities ─── */
+/* Utilities */
 
 .small { padding: 6px 12px; font-size: 0.85rem; }
 .mb { margin-bottom: var(--pico-block-spacing-vertical); }
@@ -201,9 +203,9 @@ kbd[data-tier] {
 .streak-hot { color: color-mix(in srgb, var(--amber) 70%, var(--red)); }
 
 .chat-messages { overflow-y: auto; overscroll-behavior: contain; flex: 1; margin-bottom: 8px; }
-.players-scroll { overflow-y: auto; overscroll-behavior: contain; flex: 1; }
+.players-scroll { overflow-y: auto; overscroll-behavior: contain; flex: 1; min-height: 0; }
 
-/* ── Feedback Colors  */
+/* Feedback Colors  */
 
 .feedback-success { --feedback-color: var(--green); }
 .feedback-error   { --feedback-color: var(--red); }
@@ -211,7 +213,7 @@ kbd[data-tier] {
 .feedback-border  { border-left: 4px solid var(--feedback-color); }
 .feedback-text    { color: var(--feedback-color); }
 
-/* ── Stats & Badges ─ */
+/* Stats & Badges */
 
 .stats-table td + td,
 .stat-card td + td { text-align: right; font-weight: 600; }
@@ -223,7 +225,7 @@ kbd[data-tier] {
 .stat-card td { padding: 3px 0; border: none; }
 .stat-card progress { margin: 0; }
 
-/* ── Listening chip ─── */
+/* Listening chip */
 
 .listening-chip {
     display: inline-block;
@@ -233,22 +235,22 @@ kbd[data-tier] {
     border-color: color-mix(in srgb, var(--amber) 40%, transparent);
 }
 
-/* ── Room code display ── */
+/* Room code display */
 
 .room-code-chip { font-size: 1.2rem; letter-spacing: 0.2em; }
 
-/* ── Guess submitting pulse ─── */
+/* Guess submitting pulse */
 
 .board-submitting { animation: boardPulse 0.5s ease-in-out infinite; }
 @keyframes boardPulse { 50% { opacity: 0.55; } }
 
 @keyframes boardFadeNext { 50% { opacity: 0.45; } 100% { opacity: 1; } }
 
-/* ── SSE refresh signal (spectator sees morph incoming) ─── */
+/* SSE refresh signal (spectator sees morph incoming) */
 
 .room-refreshing { opacity: 0.7; transition: opacity 0.15s ease; pointer-events: none; }
 
-/* ── Chat timestamps ─── */
+/* Chat timestamps */
 
 .chat-ts {
     float: right;
@@ -257,7 +259,7 @@ kbd[data-tier] {
     margin-left: 6px;
 }
 
-/* ── Toast ─── */
+/* Toast */
 
 [x-cloak] { display: none !important; }
 
@@ -274,14 +276,14 @@ kbd[data-tier] {
     margin: 0;
 }
 
-/* ── View Transitions ── */
+/* View Transitions */
 ::view-transition-old(root),
 ::view-transition-new(root) {
     animation-duration: 160ms;
 }
 
 
-/* ── Auth Popover ─── */
+/* Auth Popover */
 
 #auth-popover,
 #ios-install-guide {
@@ -296,7 +298,7 @@ kbd[data-tier] {
 
 #ios-install-guide { max-width: min(400px, 90vw); }
 
-/* ── PWA standalone safe-area insets (notch / home indicator) ─── */
+/* PWA standalone safe-area insets (notch / home indicator) */
 
 @media (display-mode: standalone) {
     body {
@@ -307,7 +309,7 @@ kbd[data-tier] {
     }
 }
 
-/* ── Mode Grid ─── */
+/* Mode Grid */
 
 .mode-grid button {
     display: flex;
@@ -326,7 +328,7 @@ kbd[data-tier] {
     white-space: normal;
 }
 
-/* ── Pass & Play Roster ─── */
+/* Pass & Play Roster */
 
 .player-row {
     display: flex;
@@ -360,7 +362,7 @@ kbd[data-tier] {
     50% { opacity: 0.3; }
 }
 
-/* ── Leaderboard ─── */
+/* Leaderboard */
 
 .lb-sort-header { cursor: pointer; user-select: none; white-space: nowrap; }
 .lb-sort-header:hover { text-decoration: underline; }
@@ -369,7 +371,7 @@ kbd[data-tier] {
 @container (max-width: 600px) { .lb-hide { display: none; } }
 .lb-row { border-left: 3px solid var(--row-color); }
 
-/* ── Utility additions ─── */
+/* Utility additions */
 
 .text-right { text-align: right; }
 .pt-0 { padding-top: 0 !important; }
@@ -404,7 +406,7 @@ kbd[data-tier] {
 .plain-btn:focus-visible,
 .sort-btn:focus-visible { outline: 2px solid var(--pico-primary); outline-offset: 2px; border-radius: 2px; }
 
-/* ── Stats view ─── */
+/* Stats view */
 
 .kpi-delta-up   { color: var(--green); }
 .kpi-delta-down { color: var(--red); }

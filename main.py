@@ -60,13 +60,13 @@ class ImmutableStaticFiles(StaticFiles):
         return response
 
 
-# ── Config (HTTP-only) ──
+# Config (HTTP-only)
 
 DB_PATH = ROOT / "spellingbee.db"
 MAX_BODY = 8 * 1024
 
 
-# ── HTTP helpers ──
+# HTTP helpers
 
 
 def get_session(state: AppState, request: Request) -> Session | None:
@@ -123,7 +123,7 @@ def check_creation_limits(state: AppState, request: Request) -> None:
         raise HtmxError(msg, 429)
 
 
-# ── Middleware ──
+# Middleware
 
 
 class BodyLimitMiddleware:
@@ -187,7 +187,7 @@ class SecurityHeadersMiddleware:
                 "Content-Security-Policy",
                 (
                     "default-src 'self'; "
-                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; "  # noqa: E501
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://esm.sh; "  # noqa: E501
                     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                     "img-src 'self' data:; "
                     "connect-src 'self'; "
@@ -253,7 +253,7 @@ class AccessLogMiddleware:
         )
 
 
-# ── App ─
+# App
 
 
 @asynccontextmanager
@@ -312,7 +312,7 @@ app.mount("/audios", ImmutableStaticFiles(directory=str(ROOT / "audios")), name=
 app.include_router(auth_router)
 app.include_router(account_router)
 
-# ── PWA ──
+# PWA
 
 
 @app.get("/sw.js")
@@ -362,7 +362,7 @@ async def manifest() -> Response:
     )
 
 
-# ── Routes ───
+# Routes
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -495,7 +495,7 @@ async def guess(request: Request) -> HTMLResponse:  # noqa: PLR0915
     return await tpl(request, "fragments/room.html", build_room_ctx(state, room, viewer))
 
 
-# ── Room creation / joining
+# Room creation / joining
 
 
 @app.post("/room/create", response_class=HTMLResponse)

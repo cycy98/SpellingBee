@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import hmac
 import os
 import re
@@ -41,30 +40,14 @@ ADMIN_USERS: frozenset[str] = frozenset(
 COOKIE_MAX_AGE = 3 * 24 * 3600
 
 
-def is_legacy_hash(stored: str) -> bool:
-    return not stored.startswith("$argon2")
-
-
 async def hash_password(pw: str) -> str:
     return await asyncio.to_thread(_ph.hash, pw)
 
 
 async def verify_password(pw: str, stored: str) -> bool:
-    if is_legacy_hash(stored):
-        return await asyncio.to_thread(_verify_scrypt, pw, stored)
     try:
         return await asyncio.to_thread(_ph.verify, stored, pw)
     except Argon2Error:
-        return False
-
-
-def _verify_scrypt(pw: str, stored: str) -> bool:
-    try:
-        salt_hex, hash_hex = stored.split(":")
-        salt = bytes.fromhex(salt_hex)
-        h = hashlib.scrypt(pw.encode(), salt=salt, n=16384, r=8, p=1)
-        return hmac.compare_digest(h.hex(), hash_hex)
-    except (ValueError, OSError):
         return False
 
 

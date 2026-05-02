@@ -10,6 +10,7 @@ Discord→username resolution is the caller's responsibility.
 from __future__ import annotations
 
 import asyncio
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from backend import db
@@ -89,7 +90,7 @@ class GuildOverview(NamedTuple):
 _SORT_COLS = frozenset({"elo", "games", "wins", "correct", "best_wpm", "best_streak"})
 
 
-# ─── Personal query functions ─────────────────────────────────────────────────
+# Personal query functions
 
 
 def row_to_user_stats(row: db.Row) -> UserStats:
@@ -217,7 +218,7 @@ async def _get_word_personal(word: str, username: str) -> WordStats:
     )
 
 
-# ─── Guild-scoped helpers ─────────────────────────────────────────────────────
+# Guild-scoped helpers
 
 
 _GUILD_SUBQ = "(SELECT username FROM guild_linked_users WHERE guild_id = ?)"
@@ -232,7 +233,7 @@ async def _guild_witnessed_by(guild_id: str, word: str) -> list[db.Row]:
     )
 
 
-# ─── Global leaderboard ───────────────────────────────────────────────────────
+# Global leaderboard
 
 
 async def get_leaderboard(
@@ -252,7 +253,7 @@ async def get_leaderboard(
         )
     else:
         rows = await db.fetchall(
-            f"SELECT {cols} FROM user_stats ORDER BY {sort} DESC{tb} LIMIT ?",
+            f"SELECT {cols} FROM user_stats WHERE visibility='public' ORDER BY {sort} DESC{tb} LIMIT ?",
             (limit,),
         )
     return _to_user_stats(rows)
@@ -276,7 +277,38 @@ def _to_user_stats(rows: list[db.Row]) -> list[UserStats]:
     ]
 
 
-# ─── Dashboard batch fetchers ─────────────────────────────────────────────────
+# Dashboard batch fetchers
+
+
+def _hot_streak(rows: list[db.Row]) -> int:
+    streak = 0
+    for r in rows:
+        if r["correct"]:
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def _build_heatmap(heatmap_rows: list[db.Row]) -> list[dict]:
+    today_date = date.today()  # noqa: DTZ011
+    today_str = today_date.isoformat()
+    days_map = {r["day"]: int(r["n"]) for r in heatmap_rows}
+    hm_max = max(days_map.values(), default=1) or 1
+    result = []
+    for i in range(89, -1, -1):
+        ds = (today_date - timedelta(days=i)).isoformat()
+        n = days_map.get(ds, 0)
+        pct = n / hm_max
+        result.append(
+            {
+                "date": ds,
+                "n": n,
+                "level": 0 if n == 0 else (3 if pct > 0.6 else (2 if pct > 0.25 else 1)),
+                "today": ds == today_str,
+            },
+        )
+    return result
 
 
 async def fetch_player(username: str) -> dict | None:
@@ -317,12 +349,6 @@ async def fetch_player(username: str) -> dict | None:
     )
     if profile is None:
         return None
-    hot_streak = 0
-    for r in recent_rows:
-        if r["correct"]:
-            hot_streak += 1
-        else:
-            break
     return {
         "profile": profile,
         "rank": rank,
@@ -341,7 +367,7 @@ async def fetch_player(username: str) -> dict | None:
             for r in tier_rows
         ],
         "member_since": profile.member_since,
-        "hot_streak": hot_streak,
+        "hot_streak": _hot_streak(recent_rows),
     }
 
 
@@ -390,12 +416,6 @@ async def fetch_account_page(username: str) -> dict:
             (username,),
         ),
     )
-    hot_streak = 0
-    for r in recent_rows:
-        if r["correct"]:
-            hot_streak += 1
-        else:
-            break
     avg_wpm = round(float(avg_row["avg_wpm"]), 1) if avg_row and avg_row["avg_wpm"] else 0.0
     return {
         "recent": [
@@ -410,7 +430,7 @@ async def fetch_account_page(username: str) -> dict:
         ],
         "avg_wpm": avg_wpm,
         "earned_tiers": [r["tier"] for r in tier_rows],
-        "hot_streak": hot_streak,
+        "hot_streak": _hot_streak(recent_rows),
         "rank": rank,
         "today": today,
         "elo_ts": [int(r["ts"]) for r in elo_rows],
@@ -424,7 +444,7 @@ async def fetch_account_page(username: str) -> dict:
             }
             for r in tier_rows
         ],
-        "heatmap_rows": heatmap_rows,
+        "heatmap_days": _build_heatmap(heatmap_rows),
         "wpm_ts": [int(r["ts"]) for r in wpm_rows],
         "wpm_vals": [float(r["wpm"]) for r in wpm_rows],
     }

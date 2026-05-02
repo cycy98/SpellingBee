@@ -1,0 +1,53 @@
+{# Privacy notice #}
+<div>
+  <header class="section-header">
+    <h2>Privacy Notice</h2>
+    <button type="button" class="outline secondary" @click="mainMenu()">Back</button>
+  </header>
+
+  <article>
+    <p>Spelling Bee is a hobby game. Here is what we collect and why.</p>
+
+    <h3>What we store</h3>
+    <ul>
+      <li>
+        <strong>Username and password hash</strong> — to identify you across sessions. Passwords are hashed with Argon2id and never stored in plain text.
+      </li>
+      <li>
+        <strong>Gameplay stats</strong> — every guess, WPM, tier, and match result. This is the core of the game; without it there are no leaderboards or profiles.
+      </li>
+      <li>
+        <strong>IP address</strong> — held in memory for the duration of your session and written to server logs for rate-limiting and abuse prevention. Logs clear automatically.
+      </li>
+      <li>
+        <strong>Discord ID</strong> — only if you choose to link your account via the Discord bot.
+      </li>
+    </ul>
+
+    <h3>Who can see your data</h3>
+    <p>
+      Your profile and stats are <strong>public by default</strong>. You can set your profile to <strong>private</strong> in your account settings — this hides you from the leaderboard and makes your profile page inaccessible to other players.
+    </p>
+
+    <h3>Your rights</h3>
+    <ul>
+      <li>
+        <strong>Access &amp; export</strong> — download all your data as JSON from your account page.
+      </li>
+      <li>
+        <strong>Deletion</strong> — permanently delete your account and all associated data from your account page. This cannot be undone.
+      </li>
+    </ul>
+
+    <h3>Cookies</h3>
+    <p>
+      We set three cookies: <code>auth</code> (signed login token), <code>session_id</code> (anonymous game session), and <code>local_sessions</code> (pass-and-play mode). All are strictly necessary for the game to function.
+    </p>
+
+    <h3>Data retention</h3>
+    <p>Data is kept for as long as your account exists. Deleting your account removes everything immediately.</p>
+
+    <h3>Contact</h3>
+    <p>Questions? Go on Discord to reach out to the admin.</p>
+  </article>
+</div>

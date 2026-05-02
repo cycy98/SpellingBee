@@ -5,11 +5,12 @@
 </header>
 
 {% macro sort_th(col, label, cls='') %}
-  <th class="lb-sort-header {{ cls }} {% if sort == col %}lb-sort-active{% endif %}"
+  <th class="lb-sort-header {{ cls }}
+             {% if sort == col %}lb-sort-active{% endif %}"
       aria-sort="{{ 'descending' if sort == col else 'none' }}">
-    <button type="button" class="sort-btn"
-            @click="location.hash = 'leaderboard/{{ col }}'">
-      {{ label }}{% if sort == col %} ↓{% endif %}
+    <button type="button" class="sort-btn" @click="location.hash = 'leaderboard/{{ col }}'">
+      {{ label }}
+      {% if sort == col %}↓{% endif %}
     </button>
   </th>
 {% endmacro %}

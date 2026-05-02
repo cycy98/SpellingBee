@@ -5,8 +5,8 @@
       <h2>{{ player.username }}</h2>
       <p>
         {{ player.elo | round(1) }} ELO
-        {% if rank %} · #{{ rank.rank }} of {{ rank.total }}{% endif %}
-        {% if member_since %} · member since {{ member_since | relative_time }}{% endif %}
+        {% if rank %}· #{{ rank.rank }} of {{ rank.total }}{% endif %}
+        {% if member_since %}· member since {{ member_since | relative_time }}{% endif %}
       </p>
     </hgroup>
     <nav aria-label="Account navigation">
@@ -24,7 +24,7 @@
     </div>
   {% endif %}
 
-  {# ── Activity heatmap ── #}
+  {# Activity heatmap #}
   <div class="heatmap">
     {% for d in heatmap_days %}
       <div class="heatmap-cell"
@@ -39,56 +39,70 @@
 
   <article>
     <figure>
-    <table class="stats-table">
-      <caption class="sr-only">Player statistics for {{ player.username }}</caption>
-      <tbody>
-        <tr>
-          <td><strong>Games Played</strong></td>
-          <td>{{ player.games }}</td>
-        </tr>
-        <tr>
-          <td><strong>Wins</strong></td>
-          <td>
-            {{ player.wins }}
-            {% if player.games > 0 %}
-              <small>({{ ((player.wins / player.games * 100)) | round(1) }}%)</small>
-            {% endif %}
-          </td>
-        </tr>
-        <tr>
-          <td><strong>Words Attempted</strong></td>
-          <td>{{ player.words }}</td>
-        </tr>
-        <tr>
-          <td><strong>Correct Words</strong></td>
-          <td>
-            {{ player.correct }}
-            {% if player.words > 0 %}
-              <small>({{ ((player.correct / player.words * 100)) | round(1) }}%)</small>
-            {% endif %}
-          </td>
-        </tr>
-        <tr>
-          <td><strong>Best Streak</strong></td>
-          <td>{{ player.best_streak }}</td>
-        </tr>
-        <tr>
-          <td><strong>Highest WPM</strong></td>
-          <td>
-            {{ player.best_wpm }}
-            {% if player.best_word %}<small>({{ player.best_word }})</small>{% endif %}
-          </td>
-        </tr>
-        <tr>
-          <td><strong>Avg WPM (recent)</strong></td>
-          <td>{{ avg_wpm }}</td>
-        </tr>
-      </tbody>
-    </table>
+      <table class="stats-table">
+        <caption class="sr-only">Player statistics for {{ player.username }}</caption>
+        <tbody>
+          <tr>
+            <td>
+              <strong>Games Played</strong>
+            </td>
+            <td>{{ player.games }}</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Wins</strong>
+            </td>
+            <td>
+              {{ player.wins }}
+              {% if win_pct %}
+                <small>({{ win_pct }}%)</small>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Words Attempted</strong>
+            </td>
+            <td>{{ player.words }}</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Correct Words</strong>
+            </td>
+            <td>
+              {{ player.correct }}
+              {% if player.accuracy %}
+                <small>({{ player.accuracy }}%)</small>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Best Streak</strong>
+            </td>
+            <td>{{ player.best_streak }}</td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Highest WPM</strong>
+            </td>
+            <td>
+              {{ player.best_wpm }}
+              {% if player.best_word %}<small>({{ player.best_word }})</small>{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Avg WPM (recent)</strong>
+            </td>
+            <td>{{ avg_wpm }}</td>
+          </tr>
+        </tbody>
+      </table>
     </figure>
   </article>
 
-  {# ── ELO chart ── #}
+  {# ELO chart #}
   <article>
     <header style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
       <strong>
@@ -96,15 +110,23 @@
         {% if rank and rank.elo_7d_ago is not none %}
           {% set delta = (rank.elo - rank.elo_7d_ago) | round(1) %}
           <small class="{% if delta >= 0 %}kpi-delta-up{% else %}kpi-delta-down{% endif %}">
-            &thinsp;{% if delta >= 0 %}+{% endif %}{{ delta }} this week
+            &thinsp;
+            {% if delta >= 0 %}+{% endif %}
+            {{ delta }} this week
           </small>
         {% endif %}
       </strong>
       {% if elo_ts %}
         <div role="group" style="margin:0;">
-          <button type="button" class="outline secondary small" data-range="1M" aria-pressed="false" onclick="_eloRange('1M')">1M</button>
-          <button type="button" class="outline secondary small" data-range="3M" aria-pressed="false" onclick="_eloRange('3M')">3M</button>
-          <button type="button" class="outline secondary small" data-range="All" aria-pressed="true" onclick="_eloRange('All')">All</button>
+          <button type="button" class="outline secondary small" data-range="1M" aria-pressed="false" onclick="_eloRange('1M')">
+            1M
+          </button>
+          <button type="button" class="outline secondary small" data-range="3M" aria-pressed="false" onclick="_eloRange('3M')">
+            3M
+          </button>
+          <button type="button" class="outline secondary small" data-range="All" aria-pressed="true" onclick="_eloRange('All')">
+            All
+          </button>
         </div>
       {% endif %}
     </header>
@@ -113,24 +135,30 @@
         <div id="elo-chart"></div>
       </div>
     {% else %}
-      <p><small>Play some ranked matches to see your ELO history.</small></p>
+      <p>
+        <small>Play some ranked matches to see your ELO history.</small>
+      </p>
     {% endif %}
   </article>
 
-  {# ── WPM trend chart ── #}
+  {# WPM trend chart #}
   {% if wpm_ts %}
     <article>
-      <header><strong>WPM History</strong></header>
+      <header>
+        <strong>WPM History</strong>
+      </header>
       <div id="wpm-chart-wrap" class="chart-wrap">
         <div id="wpm-chart"></div>
       </div>
     </article>
   {% endif %}
 
-  {# ── Tier accuracy ── #}
+  {# Tier accuracy #}
   {% if tiers %}
     <article>
-      <header><strong>Accuracy by Tier</strong></header>
+      <header>
+        <strong>Accuracy by Tier</strong>
+      </header>
       <figure>
         <table>
           <thead>
@@ -144,7 +172,9 @@
           <tbody>
             {% for t in tiers %}
               <tr>
-                <td><kbd data-tier="{{ t.tier }}">{{ t.tier | capitalize }}</kbd></td>
+                <td>
+                  <kbd data-tier="{{ t.tier }}">{{ t.tier | capitalize }}</kbd>
+                </td>
                 <td>{{ t.attempts }}</td>
                 <td style="min-width:140px;">
                   <div style="display:flex; align-items:center; gap:8px;">
@@ -177,7 +207,9 @@
             <tr>
               <td>{{ p.word }}</td>
               <td>{{ p.n }}</td>
-              <td><small>{{ p.definition or '—' }}</small></td>
+              <td>
+                <small>{{ p.definition or '—' }}</small>
+              </td>
             </tr>
           {% endfor %}
         </tbody>
@@ -209,9 +241,11 @@
                   <span class="missed">Missed</span>
                 {% endif %}
               </td>
-              <td>{{ (r.wpm | round(1)) if r.wpm is not none else "—" }}</td>
+              <td>{{ (r.wpm | round(1) ) if r.wpm is not none else "—" }}</td>
               <td>{{ r.tier | capitalize }}</td>
-              <td><small>{{ r.ts | relative_time }}</small></td>
+              <td>
+                <small>{{ r.ts | relative_time }}</small>
+              </td>
             </tr>
           {% endfor %}
         </tbody>
@@ -224,25 +258,47 @@
     <article>
       <form hx-post="admin/user/{{ player.username }}/edit" hx-target="#content" hx-swap="innerHTML">
         <div class="grid">
-          <label>ELO<input type="number" step="0.1" name="elo" value="{{ player.elo | round(1) }}" min="0" max="9999" required></label>
-          <label>Games<input type="number" name="games" value="{{ player.games }}" min="0" max="99999" required></label>
-          <label>Wins<input type="number" name="wins" value="{{ player.wins }}" min="0" max="99999" required></label>
-          <label>Words<input type="number" name="words" value="{{ player.words }}" min="0" max="999999" required></label>
-          <label>Correct<input type="number" name="correct" value="{{ player.correct }}" min="0" max="999999" required></label>
-          <label>Best WPM<input type="number" name="best_wpm" value="{{ player.best_wpm }}" min="0" max="9999" required></label>
-          <label>Best Streak<input type="number" name="best_streak" value="{{ player.best_streak }}" min="0" max="9999" required></label>
-          <label>Best Word<input type="text" name="best_word" value="{{ player.best_word }}"></label>
+          <label>
+            ELO
+            <input type="number" step="0.1" name="elo" value="{{ player.elo | round(1) }}" min="0" max="9999" required />
+          </label>
+          <label>
+            Games
+            <input type="number" name="games" value="{{ player.games }}" min="0" max="99999" required />
+          </label>
+          <label>
+            Wins
+            <input type="number" name="wins" value="{{ player.wins }}" min="0" max="99999" required />
+          </label>
+          <label>
+            Words
+            <input type="number" name="words" value="{{ player.words }}" min="0" max="999999" required />
+          </label>
+          <label>
+            Correct
+            <input type="number" name="correct" value="{{ player.correct }}" min="0" max="999999" required />
+          </label>
+          <label>
+            Best WPM
+            <input type="number" name="best_wpm" value="{{ player.best_wpm }}" min="0" max="9999" required />
+          </label>
+          <label>
+            Best Streak
+            <input type="number" name="best_streak" value="{{ player.best_streak }}" min="0" max="9999" required />
+          </label>
+          <label>
+            Best Word
+            <input type="text" name="best_word" value="{{ player.best_word }}" />
+          </label>
         </div>
         <button type="submit">Save Changes</button>
       </form>
-      <hr>
+      <hr />
       <button class="secondary"
               hx-post="admin/user/{{ player.username }}/delete"
               hx-target="#content"
               hx-swap="innerHTML"
-              hx-confirm="Permanently delete {{ player.username }}? This cannot be undone.">
-        Delete User
-      </button>
+              hx-confirm="Permanently delete {{ player.username }}? This cannot be undone.">Delete User</button>
     </article>
   {% endif %}
 
@@ -259,6 +315,17 @@
           </select>
           <button type="submit">Save</button>
         </div>
+        <fieldset>
+          <legend>Profile visibility</legend>
+          <label>
+            <input type="radio" name="visibility" value="public"{% if player.visibility != 'private' %} checked{% endif %} />
+            Public — shown on leaderboard and searchable by others
+          </label>
+          <label>
+            <input type="radio" name="visibility" value="private"{% if player.visibility == 'private' %} checked{% endif %} />
+            Private — hidden from leaderboard, profile inaccessible to others
+          </label>
+        </fieldset>
       </form>
     </article>
 
@@ -269,13 +336,38 @@
           <button type="button">Add to Discord</button>
         </a>
       {% endif %}
-      <p><small>To link your Discord account, run <code>/account link {{ player.username }} {{ discord_link_code }}</code> in Discord. The code refreshes every 10 minutes.</small></p>
+      <p>
+        <small>To link your Discord account, run <code>/account link {{ player.username }} {{ discord_link_code }}</code> in Discord. The code refreshes every 10 minutes.</small>
+      </p>
+    </article>
+
+    <h3>Data</h3>
+    <article>
+      <p>
+        <a href="account/export" download="{{ player.username }}-data.json">Download my data (JSON)</a>
+      </p>
+      <hr />
+      <details>
+        <summary>Delete account</summary>
+        <form hx-post="account/delete" hx-swap="none" style="margin-top:1rem;">
+          <p>
+            <small>This permanently deletes your account and all gameplay data. It cannot be undone.</small>
+          </p>
+          <label for="delete-password">
+            Confirm your password
+            <input type="password" id="delete-password" name="password" required autocomplete="current-password" />
+          </label>
+          <button type="submit" class="secondary" hx-confirm="Permanently delete your account and all data? This cannot be undone.">
+            Delete my account
+          </button>
+        </form>
+      </details>
     </article>
   {% endif %}
 </div>
 
 {% if elo_ts %}
-<script>
+  <script>
 (function () {
   const allTs  = Float64Array.from({{ elo_ts | tojson }});
   const allElo = Float64Array.from({{ elo_vals | tojson }});
@@ -336,11 +428,11 @@
   new ResizeObserver(() => draw(_range))
     .observe(document.getElementById('elo-chart-wrap'));
 })();
-</script>
+  </script>
 {% endif %}
 
 {% if wpm_ts %}
-<script>
+  <script>
 (function () {
   const allTs  = Float64Array.from({{ wpm_ts | tojson }});
   const allWpm = Float64Array.from({{ wpm_vals | tojson }});
@@ -385,5 +477,5 @@
   draw();
   new ResizeObserver(draw).observe(document.getElementById('wpm-chart-wrap'));
 })();
-</script>
+  </script>
 {% endif %}

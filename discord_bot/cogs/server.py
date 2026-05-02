@@ -52,7 +52,7 @@ class ServerCog(commands.Cog):
     async def cog_unload(self) -> None:
         self._consume_loop.cancel()
 
-    # ── Notification loop ─────────────────────────────────────────────────────
+    #  Notification loop
 
     @tasks.loop()
     async def _consume_loop(self) -> None:
@@ -100,7 +100,7 @@ class ServerCog(commands.Cog):
             with contextlib.suppress(discord.Forbidden, discord.HTTPException):
                 await channel.send(embed=embed)
 
-    # ── Admin groups ──────────────────────────────────────────────────────────
+    #  Admin groups
 
     admin_group = app_commands.Group(
         name="admin",
@@ -119,7 +119,7 @@ class ServerCog(commands.Cog):
         ),
     )
 
-    # ── Admin commands ────────────────────────────────────────────────────────
+    #  Admin commands
 
     @admin_group.command(
         name="announce",

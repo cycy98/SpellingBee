@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import os
-from datetime import date, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
 _DISCORD_ID = os.environ.get("DISCORD_ID")
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from backend import db, stats
-from backend.auth import ADMIN_USERS, discord_link_code, get_current_user
+from backend.auth import ADMIN_USERS, discord_link_code, get_current_user, verify_password
 from backend.errors import HtmxError
 from backend.progression import compute_progression
 from templating import PICO_THEMES, set_theme, tpl
@@ -36,6 +35,14 @@ async def leaderboard(request: Request, sort: str = "elo") -> HTMLResponse:
     )
 
 
+async def _fetch_user_row(username: str) -> db.Row:
+    row = await db.fetchone("SELECT * FROM user_stats WHERE username = ?", (username,))
+    if not row:
+        msg = "Player not found."
+        raise HtmxError(msg, 404)
+    return row
+
+
 async def _account_ctx(username: str, catalog: Catalog, row: db.Row) -> dict[str, Any]:
     profile = stats.row_to_user_stats(row)
     data, study = await asyncio.gather(
@@ -43,39 +50,50 @@ async def _account_ctx(username: str, catalog: Catalog, row: db.Row) -> dict[str
         stats.get_study_list(username, catalog),
     )
     progression = compute_progression(profile)
-    today_date = date.today()  # noqa: DTZ011
-    today_str = today_date.isoformat()
-    hm_rows = data.pop("heatmap_rows")
-    days_map = {r["day"]: int(r["n"]) for r in hm_rows}
-    hm_max = max(days_map.values(), default=1) or 1
-    heatmap_days = []
-    for i in range(89, -1, -1):
-        ds = (today_date - timedelta(days=i)).isoformat()
-        n = days_map.get(ds, 0)
-        pct = n / hm_max
-        heatmap_days.append(
-            {
-                "date": ds,
-                "n": n,
-                "level": 0 if n == 0 else (3 if pct > 0.6 else (2 if pct > 0.25 else 1)),
-                "today": ds == today_str,
-            },
-        )
+    win_pct = round(row["wins"] / row["games"] * 100, 1) if row["games"] > 0 else 0.0
     return {
         **data,
         "practice": [{"word": s.word, "n": s.n, "definition": s.definition} for s in study],
         "badges": [(b.name, b.icon) for b in progression.earned_badges],
         "discord_id": _DISCORD_ID,
         "discord_link_code": discord_link_code(username),
-        "heatmap_days": heatmap_days,
         "member_since": profile.member_since,
+        "win_pct": win_pct,
     }
+
+
+@router.get("/account/export")
+async def export_account(request: Request) -> JSONResponse:
+    user = get_current_user(request)
+    if not user:
+        msg = "Not logged in."
+        raise HtmxError(msg, 403)
+    guesses, matches, summary = await asyncio.gather(
+        db.fetchall(
+            "SELECT word, correct, wpm, tier, streak, ts FROM guess_log WHERE username=? ORDER BY ts",
+            (user,),
+        ),
+        db.fetchall(
+            "SELECT match_id, rank, elo_after, ts FROM match_results WHERE username=? ORDER BY ts",
+            (user,),
+        ),
+        db.fetchone("SELECT * FROM user_stats WHERE username=?", (user,)),
+    )
+    payload = {
+        "username": user,
+        "summary": dict(summary) if summary else {},
+        "guess_log": [dict(r) for r in guesses],
+        "match_results": [dict(r) for r in matches],
+    }
+    headers = {"Content-Disposition": f'attachment; filename="{user}-data.json"'}
+    return JSONResponse(content=payload, headers=headers)
 
 
 @router.get("/account/{username}", response_class=HTMLResponse)
 async def account_view(request: Request, username: str) -> HTMLResponse:
-    row = await db.fetchone("SELECT * FROM user_stats WHERE username = ?", (username,))
-    if not row:
+    row = await _fetch_user_row(username)
+    viewer = get_current_user(request)
+    if row["visibility"] == "private" and viewer != username and viewer not in ADMIN_USERS:
         msg = "Player not found."
         raise HtmxError(msg, 404)
     catalog: Catalog = request.app.state.srv.catalog
@@ -92,7 +110,11 @@ async def account_view(request: Request, username: str) -> HTMLResponse:
 
 
 @router.post("/account/settings", response_class=HTMLResponse)
-async def update_settings(request: Request, theme: Annotated[str, Form()]) -> Response:
+async def update_settings(
+    request: Request,
+    theme: Annotated[str, Form()],
+    visibility: Annotated[str, Form()] = "public",
+) -> Response:
     user = get_current_user(request)
     if not user:
         msg = "Not logged in."
@@ -100,8 +122,14 @@ async def update_settings(request: Request, theme: Annotated[str, Form()]) -> Re
     if theme not in PICO_THEMES:
         msg = "Invalid theme."
         raise HtmxError(msg, 400)
+    if visibility not in ("public", "private"):
+        msg = "Invalid visibility."
+        raise HtmxError(msg, 400)
     async with db.transaction() as conn:
-        await conn.execute("UPDATE users SET theme=? WHERE username=?", (theme, user))
+        await conn.execute(
+            "UPDATE users SET theme=?, visibility=? WHERE username=?",
+            (theme, visibility, user),
+        )
     set_theme(user, theme)
     return Response(status_code=204, headers={"HX-Refresh": "true"})
 
@@ -137,10 +165,7 @@ async def admin_edit_user(
             (bio[:500], visibility, suspend_ts, username),
         )
     catalog: Catalog = request.app.state.srv.catalog
-    row = await db.fetchone("SELECT * FROM user_stats WHERE username=?", (username,))
-    if not row:
-        msg = "Player not found."
-        raise HtmxError(msg, 404)
+    row = await _fetch_user_row(username)
     ctx = {"player": row, **(await _account_ctx(username, catalog, row))}
     return await tpl(request, "fragments/account.html", ctx)
 
@@ -160,6 +185,32 @@ async def admin_delete_user(request: Request, username: str) -> Response:
     return Response(status_code=200, headers={"HX-Redirect": f"{root}/leaderboard"})
 
 
+@router.post("/account/delete", response_class=HTMLResponse)
+async def delete_account(
+    request: Request,
+    password: Annotated[str, Form()],
+) -> Response:
+    user = get_current_user(request)
+    if not user:
+        msg = "Not logged in."
+        raise HtmxError(msg, 403)
+    row = await db.fetchone("SELECT pw_hash FROM users WHERE username=?", (user,))
+    if not row or not await verify_password(password, row["pw_hash"]):
+        msg = "Incorrect password."
+        raise HtmxError(msg, 400)
+    async with db.transaction() as conn:
+        await conn.execute("DELETE FROM users WHERE username=?", (user,))
+    root = request.scope.get("root_path", "")
+    resp = Response(status_code=200, headers={"HX-Redirect": f"{root}/"})
+    resp.delete_cookie("auth", path="/")
+    return resp
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy(request: Request) -> HTMLResponse:
+    return await tpl(request, "fragments/privacy.html", {})
+
+
 @router.get("/stats/{username}", response_class=HTMLResponse)
 async def stats_view(request: Request, username: str) -> Response:
     root = request.scope.get("root_path", "")
@@ -175,10 +226,7 @@ async def own_account(request: Request) -> HTMLResponse:
     if not user:
         msg = "Not logged in."
         raise HtmxError(msg, 403)
-    row = await db.fetchone("SELECT * FROM user_stats WHERE username = ?", (user,))
-    if not row:
-        msg = "Player not found."
-        raise HtmxError(msg, 404)
+    row = await _fetch_user_row(user)
     catalog: Catalog = request.app.state.srv.catalog
     return await tpl(
         request,

@@ -12,7 +12,6 @@ from backend import db
 from backend.auth import (
     get_current_user,
     hash_password,
-    is_legacy_hash,
     set_auth_cookie,
     verify_password,
 )
@@ -79,14 +78,6 @@ async def login(request: Request) -> HTMLResponse:
             "fragments/menu.html",
             {"auth_error": "Unknown username or password."},
         )
-
-    if is_legacy_hash(row["pw_hash"]):
-        new_hash = await hash_password(password)
-        async with db.transaction() as conn:
-            await conn.execute(
-                "UPDATE users SET pw_hash = ? WHERE username = ?",
-                (new_hash, row["username"]),
-            )
 
     stats_row = await db.fetchone("SELECT elo FROM user_stats WHERE username=?", (row["username"],))
     elo = float(stats_row["elo"]) if stats_row else 1000.0

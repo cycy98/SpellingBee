@@ -3,10 +3,14 @@
   <ul>
     <li>
       <strong class="amber">
-        {% if mode == 'solo' %}Solo
-        {% elif mode == 'local' %}Local
-        {% elif mode == 'public' %}Public Arena
-        {% else %}Lobby {{ room.code }}
+        {% if mode == 'solo' %}
+          Solo
+        {% elif mode == 'local' %}
+          Local
+        {% elif mode == 'public' %}
+          Public Arena
+        {% else %}
+          Lobby {{ room.code }}
         {% endif %}
       </strong>
       {% if room.game_number > 1 %}<small>Game {{ room.game_number }}</small>{% endif %}
@@ -14,7 +18,9 @@
   </ul>
   <ul>
     <li>
-      <button type="button" class="outline secondary small nav-icon-btn" @click="muted = !muted"
+      <button type="button"
+              class="outline secondary small nav-icon-btn"
+              @click="muted = !muted; window.tiks?.toggle(!muted)"
               :aria-label="muted ? 'Unmute' : 'Mute'"
               x-text="muted ? '🔇' : (volume < 0.4 ? '🔈' : '🔊')"></button>
     </li>

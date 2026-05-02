@@ -90,7 +90,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.iife.min.js"></script>
 <script>
-// ── Seeded PRNG (xorshift32) for reproducible sample data ──────────────────
+// Seeded PRNG (xorshift32) for reproducible sample data
 let _seed = 0xdeadbeef;
 const rand  = () => { _seed ^= _seed << 13; _seed ^= _seed >> 17; _seed ^= _seed << 5; return (_seed >>> 0) / 0xffffffff; };
 const rng   = (lo, hi) => lo + rand() * (hi - lo);
@@ -110,7 +110,7 @@ const C = {
   lime:   '#84cc16',
 };
 
-// ── Common axis styling for dark theme ─────────────────────────────────────
+// Common axis styling for dark theme
 const axisStyle = {
   stroke: '#718096',
   grid:  { stroke: '#2d3748', width: 1 },
@@ -121,7 +121,7 @@ function chartWidth(id) {
   return document.getElementById(id).parentElement.clientWidth - 40;
 }
 
-// ── 1. ELO Progression ─────────────────────────────────────────────────────
+// 1. ELO Progression
 {
   const PLAYERS = ['alice', 'bob', 'charlie', 'diana', 'eve'];
   const COLORS  = [C.amber, C.teal, C.blue, C.rose, C.violet];
@@ -165,7 +165,7 @@ function chartWidth(id) {
   ], document.getElementById('chart-elo'));
 }
 
-// ── 2. Daily Activity ───────────────────────────────────────────────────────
+// 2. Daily Activity
 {
   const N = 60;
   const days = [], attempts = [], correct = [];
@@ -198,7 +198,7 @@ function chartWidth(id) {
   ], document.getElementById('chart-activity'));
 }
 
-// ── 3. Accuracy by Tier ─────────────────────────────────────────────────────
+// 3. Accuracy by Tier
 {
   const TIERS   = ['easy', 'medium', 'hard', 'expert'];
   const accPct  = [91, 76, 59, 42];
@@ -249,7 +249,7 @@ function chartWidth(id) {
   document.getElementById('chart-tiers'));
 }
 
-// ── 4. WPM Histogram ────────────────────────────────────────────────────────
+// 4. WPM Histogram
 {
   // Roughly log-normal WPM distribution centred around ~80 wpm
   const BUCKETS = ['<30','30-50','50-70','70-90','90-110','110-140','140-180','180+'];
@@ -291,7 +291,7 @@ function chartWidth(id) {
   document.getElementById('chart-wpm'));
 }
 
-// ── 5. Word Difficulty (word_stats view) ────────────────────────────────────
+// 5. Word Difficulty (word_stats view)
 {
   // Hardest words: low accuracy, min 20 attempts
   const WORDS = [

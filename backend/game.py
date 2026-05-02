@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, NamedTuple, NotRequired, TypedDict, cast
 
-# ── Domain types ──
+# Domain types
 
 type Visibility = Literal["private", "public", "solo", "local"]
 
@@ -53,7 +53,7 @@ class MatchResult(TypedDict):
     elo_delta: NotRequired[float]
 
 
-# ── Config ───
+# Config
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_CHAT = 80
@@ -106,7 +106,7 @@ RATE_LIMITS: dict[str, tuple[int, int]] = {
     "draft": (60, 60),
 }
 
-# ── Word catalog ──
+# Word catalog
 
 
 @dataclass
@@ -185,7 +185,7 @@ def _load_audio_durations(root: Path) -> dict[str, float]:
     return durations
 
 
-# ── In-memory state ──
+# In-memory state
 
 
 @dataclass
@@ -266,7 +266,10 @@ class Game:
 
     def serve_new_word(self, streak: int = 0) -> None:
         assert self.catalog is not None, "Game.catalog must be set before serving words"  # noqa: S101
+        last = self.current_word["word"] if self.current_word else None
         word_data = self.catalog.pick_word(self.difficulty)
+        if word_data["word"] == last:
+            word_data = self.catalog.pick_word(self.difficulty)
         self.current_word = word_data
         self.word_served_at = time.time()
         self.draft_text = ""
@@ -596,7 +599,7 @@ class Room:
         self.locked = not self.locked
 
 
-# ── Pure helpers ──
+# Pure helpers
 
 
 def feedback(title: str, body: str = "", kind: str = "error") -> Feedback:

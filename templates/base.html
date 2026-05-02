@@ -1,14 +1,15 @@
 <!DOCTYPE html>
-<html
-  data-theme="dark"
-  lang="en"
->
+<html data-theme="dark" lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="preconnect" href="https://unpkg.com" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <title>{% block title %}Spelling Bee{% endblock title %}</title>
+    <title>
+      {% block title %}
+        Spelling Bee
+      {% endblock title %}
+    </title>
     <base href="{{ request.scope.get('root_path', '').rstrip('/') }}/" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.{{ pico_theme }}.min.css" />
     <link rel="stylesheet" href="static/styles.css" />
@@ -45,6 +46,11 @@
             src="https://unpkg.com/alpinejs@3.15.11/dist/cdn.min.js"
             integrity="sha384-WPtu0YHhJ3arcykfnv1JgUffWDSKRnqnDeTpJUbOc2os2moEmLkIdaeR0trPN4be"
             crossorigin="anonymous"></script>
+    <script type="module">
+      import { tiks } from 'https://esm.sh/@rexa-developer/tiks';
+      tiks.init();
+      window.tiks = tiks;
+    </script>
   </head>
   <body>
     <main x-data="spellingBee()" class="container" hx-ext="morph">
@@ -54,16 +60,25 @@
                x-show="toastMsg"
                x-transition
                class="toast feedback-border"
-           :class="`feedback-${toastType}`"
-           role="alert"
-           aria-live="assertive"
-           @click="toastMsg = ''; clearTimeout(toastTimer)"
-           x-text="toastMsg"></article>
+               :class="`feedback-${toastType}`"
+               role="alert"
+               aria-live="assertive"
+               @click="toastMsg = ''; clearTimeout(toastTimer)"
+               x-text="toastMsg"></article>
     </main>
     <script>
     /* aria-busy loading indicators on HTMX buttons (Pico renders a spinner) */
     document.addEventListener('htmx:beforeRequest', (e) => {
         if (e.detail.elt.tagName === 'BUTTON') e.detail.elt.setAttribute('aria-busy', 'true');
+        const app = Alpine.$data(document.querySelector('[x-data]'));
+        if (!app) return;
+        const path = e.detail.requestConfig?.path || '';
+        const method = (e.detail.requestConfig?.verb || '').toUpperCase();
+        const customSfx = e.detail.elt?.dataset?.sfx;
+        if (customSfx) { app.sfx(customSfx); return; }
+        if (['guess', 'draft', 'chat', 'lock'].some(x => path.includes(x))) return;
+        if (method === 'GET' && e.detail.target?.id === 'content') app.sfx('swoosh');
+        else if (method === 'POST') app.sfx('pop');
     });
     document.addEventListener('htmx:afterRequest', (e) => {
         if (e.detail.elt.tagName === 'BUTTON') e.detail.elt.removeAttribute('aria-busy');
@@ -105,17 +120,19 @@
             const next = parseInt(nextBtn.dataset.readyCount, 10);
             if (!isNaN(prev) && !isNaN(next) && next > prev && app) {
                 app.showToast('A player voted to rematch!', 'info');
+                app.sfx('notify');
             }
         }
 
         if (!e.detail.requestConfig?.path?.includes('guess')) return;
         const board = document.querySelector('[data-board]');
         if (!board) return;
-        const cls = board.dataset.feedback === 'success'
-            ? 'board-correct' : 'board-incorrect';
+        const isCorrect = board.dataset.feedback === 'success';
+        const cls = isCorrect ? 'board-correct' : 'board-incorrect';
         board.classList.remove('board-correct', 'board-incorrect');
         board.classList.add(cls);
         board.addEventListener('animationend', () => board.classList.remove(cls), { once: true });
+        if (app) app.sfx(isCorrect ? 'success' : 'error');
     });
 
     function spellingBee() {
@@ -171,6 +188,10 @@
                             setTimeout(() => rs.classList.remove('room-refreshing'), 300);
                         }
                     }
+                });
+                window.addEventListener('htmx:afterSettle', () => {
+                    const el = document.querySelector('.chat-messages');
+                    if (el) el.scrollTop = el.scrollHeight;
                 });
                 window.addEventListener('htmx:sseError', async () => {
                     if (!this.roomCode) return;
@@ -311,6 +332,7 @@
             sendChat(roomCode) {
                 if (!this.chatMsg.trim()) return;
                 if (this.checkProfanity(this.chatMsg, 'message')) return;
+                this.sfx('swoosh');
                 htmx.ajax('POST', `room/${roomCode}/chat`, {
                     values: { message: this.chatMsg },
                     swap: 'none'
@@ -340,6 +362,10 @@
                 this.profanityError = '';
                 return false;
             },
+
+            sfx(name) {
+                if (!this.muted) window.tiks?.[name]?.();
+            },
         }
     }
     function sbNavigate(hash) {
@@ -358,6 +384,8 @@
                 if (user) location.hash = `account/${user}`;
                 break;
             }
+            case 'privacy':
+                htmx.ajax('GET', 'privacy', swap); break;
             case 'room':
                 if (args[0]) {
                     const cur = Alpine.$data(document.querySelector('[x-data]'))?.roomCode;

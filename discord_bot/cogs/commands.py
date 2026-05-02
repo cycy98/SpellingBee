@@ -22,7 +22,7 @@ from discord_bot.db.types import DiscordId, GuildId, NotifyTier, Username
 if TYPE_CHECKING:
     from discord_bot.bot import BotCore
 
-# ─── Constants & helpers ─────────────────────────────────────────────────────
+#  Constants & helpers
 
 SPELLINGBEE_URL = os.environ.get("SPELLINGBEE_URL", "https://spellingbee.app")
 
@@ -132,7 +132,7 @@ async def resolve_username(
     return user.username
 
 
-# ─── Play helpers ─────────────────────────────────────────────────────────────
+#  Play helpers
 
 
 class ChallengeView(discord.ui.View):
@@ -184,9 +184,9 @@ def _make_bracket(players: list[str]) -> str:
     return "\n".join(lines)
 
 
-# ─── Account commands ─────────────────────────────────────────────────────────
-# ─── Dashboard commands ───────────────────────────────────────────────────────
-# ─── Play commands ────────────────────────────────────────────────────────────
+#  Account commands
+#  Dashboard commands
+#  Play commands
 
 
 class CommandsCog(commands.Cog):
@@ -194,7 +194,7 @@ class CommandsCog(commands.Cog):
         self.bot = bot
         self._populated_guilds: set[str] = set()
 
-    # ── Account groups ────────────────────────────────────────────────────────
+    #  Account groups
 
     account_group = app_commands.Group(
         name="account",
@@ -218,7 +218,7 @@ class CommandsCog(commands.Cog):
         ),
     )
 
-    # ── Dashboard groups ──────────────────────────────────────────────────────
+    #  Dashboard groups
 
     server_group = app_commands.Group(
         name="server",
@@ -226,7 +226,7 @@ class CommandsCog(commands.Cog):
         guild_only=True,
     )
 
-    # ── Account helpers ───────────────────────────────────────────────────────
+    #  Account helpers
 
     async def _ensure_guild_populated(self, guild: discord.Guild) -> None:
         guild_id_str = str(guild.id)
@@ -238,7 +238,7 @@ class CommandsCog(commands.Cog):
         )
         self._populated_guilds.add(guild_id_str)
 
-    # ── Account commands ──────────────────────────────────────────────────────
+    #  Account commands
 
     @account_group.command(name="link", description="Link your Discord to a Spelling Bee username.")
     @app_commands.describe(
@@ -288,7 +288,7 @@ class CommandsCog(commands.Cog):
 
         await interaction.response.send_message(
             f"Linked to **{username}**.",
-            ephemeral=True,
+            ephemeral=False,
         )
 
     @account_group.command(name="unlink", description="Unlink your Discord from Spelling Bee.")
@@ -334,7 +334,7 @@ class CommandsCog(commands.Cog):
                 style=discord.ButtonStyle.link,
             ),
         )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
     @notify_group.command(name="tier", description="Set your notification verbosity level.")
     @app_commands.describe(level="1=Critical, 2=Social, 3=Personal, 4=Ambient")
@@ -381,7 +381,7 @@ class CommandsCog(commands.Cog):
             DiscordId(str(member.id)),
         )
 
-    # ── Dashboard commands ────────────────────────────────────────────────────
+    #  Dashboard commands
 
     @server_group.command(name="stats", description="Server stats overview.")
     async def server_stats(self, interaction: discord.Interaction) -> None:
@@ -421,7 +421,7 @@ class CommandsCog(commands.Cog):
             return
         d = await bstats.fetch_player(username)
         if d is None:
-            await interaction.response.send_message("No account found.", ephemeral=True)
+            await interaction.response.send_message("No account found.", ephemeral=False)
             return
         p, r, t = d["profile"], d["rank"], d["today"]
         acc = f"{100 * p.correct / p.words:.1f}%" if p.words else "—"
@@ -548,7 +548,7 @@ class CommandsCog(commands.Cog):
             ephemeral=user is None,
         )
 
-    # ── Link commands ─────────────────────────────────────────────────────────
+    #  Link commands
 
     @app_commands.command(name="invite", description="Post a public lobby link to this channel.")
     @app_commands.allowed_installs(guilds=True, users=True)
@@ -576,9 +576,9 @@ class CommandsCog(commands.Cog):
         )
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="Open →", url=url, style=discord.ButtonStyle.link))
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
-    # ── Play commands ─────────────────────────────────────────────────────────
+    #  Play commands
 
     @app_commands.command(name="play", description="Start a Spelling Bee game.")
     @app_commands.allowed_installs(guilds=True, users=True)
@@ -601,7 +601,7 @@ class CommandsCog(commands.Cog):
             description=desc,
             color=COLOR_WIN,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
     @play.autocomplete("tier")
     async def tier_autocomplete(
@@ -632,7 +632,7 @@ class CommandsCog(commands.Cog):
         if target_user is None:
             await interaction.response.send_message(
                 f"No linked Discord account found for **{target}**.",
-                ephemeral=True,
+                ephemeral=False,
             )
             return
         target_discord_id = target_user.discord_id
@@ -679,7 +679,7 @@ class CommandsCog(commands.Cog):
         if row is None:
             await interaction.response.send_message(
                 f"No shared match history found with **{user}**.",
-                ephemeral=True,
+                ephemeral=False,
             )
             return
 
@@ -697,7 +697,7 @@ class CommandsCog(commands.Cog):
                 style=discord.ButtonStyle.link,
             ),
         )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
     @app_commands.command(
         name="tournament",
@@ -731,7 +731,7 @@ class CommandsCog(commands.Cog):
         if len(players) < 2:
             await interaction.response.send_message(
                 "Need at least 2 participants to make a bracket.",
-                ephemeral=True,
+                ephemeral=False,
             )
             return
 

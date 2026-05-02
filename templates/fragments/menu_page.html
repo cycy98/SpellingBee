@@ -3,26 +3,30 @@
 {# Title row + auth trigger — auth lives in a popover, not inline #}
 <header class="section-header">
   <h1>Spelling Bee</h1>
-  <button class="outline secondary"
-          popovertarget="auth-popover"
-          x-text="loggedInUser || 'Sign in'">Sign in</button>
+  <button class="outline secondary" popovertarget="auth-popover" x-text="loggedInUser || 'Sign in'">Sign in</button>
 </header>
 
 {# Auth popover — HTMX swaps #auth-section inside here on login/logout #}
 <div id="auth-popover" popover="auto">
-  <article>
-    {% include "fragments/menu.html" %}
-  </article>
+  <article>{% include "fragments/menu.html" %}</article>
 </div>
 
 {# iOS install guide popover #}
 <div id="ios-install-guide" popover="auto" x-ref="iosGuide">
   <article>
-    <header><strong>Add to Home Screen</strong></header>
+    <header>
+      <strong>Add to Home Screen</strong>
+    </header>
     <ol>
-      <li>Tap the <strong>Share</strong> button in Safari's toolbar (box with arrow pointing up)</li>
-      <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
-      <li>Tap <strong>Add</strong> in the top-right corner</li>
+      <li>
+        Tap the <strong>Share</strong> button in Safari's toolbar (box with arrow pointing up)
+      </li>
+      <li>
+        Scroll down and tap <strong>Add to Home Screen</strong>
+      </li>
+      <li>
+        Tap <strong>Add</strong> in the top-right corner
+      </li>
     </ol>
     <button class="secondary" popovertarget="ios-install-guide" popovertargetaction="hide">Done</button>
   </article>
@@ -38,8 +42,7 @@
   <article role="alert" class="feedback-border feedback-info" x-show="online">
     <div class="section-header">
       <strong class="amber">You're still in room {{ reconnect_code }}.</strong>
-      <button class="secondary small"
-              @click="location.hash = 'room/{{ reconnect_code }}'">Rejoin</button>
+      <button class="secondary small" @click="location.hash = 'room/{{ reconnect_code }}'">Rejoin</button>
     </div>
   </article>
 {% endif %}
@@ -51,17 +54,21 @@
   <div class="section-header">
     <div>
       <strong>Install Spelling Bee</strong>
-      <br><small>Play offline · home screen access · no browser chrome</small>
+      <br />
+      <small>Play offline · home screen access · no browser chrome</small>
     </div>
     <div role="group">
       <button class="small"
               x-show="canInstall"
-              @click="async () => { const r = await _installPrompt.prompt(); if (r.outcome === 'accepted') { canInstall = false; _installPrompt = null; } }">Install</button>
-      <button class="small secondary"
-              x-show="isIOS && !canInstall"
-              @click="$refs.iosGuide.showPopover()">How to install</button>
-      <button class="small outline secondary"
-              @click="installDismissed = true; localStorage.setItem('sbInstallSnoozed', Date.now())">Not now</button>
+              @click="async () => { const r = await _installPrompt.prompt(); if (r.outcome === 'accepted') { canInstall = false; _installPrompt = null; } }">
+        Install
+      </button>
+      <button class="small secondary" x-show="isIOS && !canInstall" @click="$refs.iosGuide.showPopover()">
+        How to install
+      </button>
+      <button class="small outline secondary" @click="installDismissed = true; localStorage.setItem('sbInstallSnoozed', Date.now())">
+        Not now
+      </button>
     </div>
   </div>
 </article>
@@ -72,17 +79,15 @@
   <div class="grid mb">
     <label for="player-name">
       Name
-      <input
-        type="text"
-        id="player-name"
-        minlength="1"
-        maxlength="24"
-        pattern="[A-Za-z0-9 '_\-]{1,24}"
-        title="Letters, numbers, spaces, apostrophes, hyphens — max 24"
-        placeholder="Player One"
-        x-model="playerName"
-        @input="playerName = $event.target.value = $event.target.value.replace(/[^A-Za-z0-9 '_-]/g, ''); nameTracksLogin = false; profanityError = ''"
-      />
+      <input type="text"
+             id="player-name"
+             minlength="1"
+             maxlength="24"
+             pattern="[A-Za-z0-9 '_\-]{1,24}"
+             title="Letters, numbers, spaces, apostrophes, hyphens — max 24"
+             placeholder="Player One"
+             x-model="playerName"
+             @input="playerName = $event.target.value = $event.target.value.replace(/[^A-Za-z0-9 '_-]/g, ''); nameTracksLogin = false; profanityError = ''" />
     </label>
     <label for="difficulty">
       Difficulty
@@ -98,46 +103,38 @@
 
   {# Mode cards — 2×2 grid, one clear action per mode #}
   <div class="grid mode-grid mb">
-    <button
-      type="button"
-      hx-post="room/create"
-      hx-target="#content"
-      hx-swap="innerHTML transition:true"
-      :hx-vals="JSON.stringify({ difficulty: difficulty, player_name: playerName || 'Player', visibility: 'solo' })"
-    >
+    <button type="button"
+            hx-post="room/create"
+            hx-target="#content"
+            hx-swap="innerHTML transition:true"
+            :hx-vals="JSON.stringify({ difficulty: difficulty, player_name: playerName || 'Player', visibility: 'solo' })">
       <strong>Solo</strong>
       <span>Practice at your own pace</span>
     </button>
-    <button
-      type="button"
-      :class="showPassPlay ? 'contrast' : 'secondary'"
-      :aria-pressed="showPassPlay"
-      @click="showPassPlay = !showPassPlay"
-    >
+    <button type="button"
+            :class="showPassPlay ? 'contrast' : 'secondary'"
+            :aria-pressed="showPassPlay"
+            @click="showPassPlay = !showPassPlay">
       <strong>Pass &amp; Play</strong>
       <span>Take turns on one device</span>
     </button>
-    <button
-      type="button"
-      class="secondary"
-      hx-post="room/create"
-      hx-target="#content"
-      hx-swap="innerHTML transition:true"
-      :hx-vals="JSON.stringify({ difficulty: difficulty, player_name: playerName })"
-    >
+    <button type="button"
+            class="secondary"
+            hx-post="room/create"
+            hx-target="#content"
+            hx-swap="innerHTML transition:true"
+            :hx-vals="JSON.stringify({ difficulty: difficulty, player_name: playerName })">
       <strong>Create Lobby</strong>
       <span>Invite friends with a room code</span>
     </button>
-    <button
-      type="button"
-      class="secondary"
-      :disabled="!loggedInUser"
-      :title="loggedInUser ? '' : 'Sign in for ranked matchmaking'"
-      hx-post="public/join"
-      hx-target="#content"
-      hx-swap="innerHTML transition:true"
-      :hx-vals="JSON.stringify({ difficulty: difficulty })"
-    >
+    <button type="button"
+            class="secondary"
+            :disabled="!loggedInUser"
+            :title="loggedInUser ? '' : 'Sign in for ranked matchmaking'"
+            hx-post="public/join"
+            hx-target="#content"
+            hx-swap="innerHTML transition:true"
+            :hx-vals="JSON.stringify({ difficulty: difficulty })">
       <strong>Public Arena</strong>
       <span>Ranked matchmaking</span>
     </button>
@@ -149,38 +146,31 @@
       <template x-for="(p, i) in localPlayers" :key="i">
         <div class="player-row">
           <span class="player-dot" :style="`background:${nameColor(localPlayers[i] || ('Player ' + (i + 1)))}`"></span>
-          <input
-            type="text"
-            minlength="1"
-            maxlength="24"
-            :aria-label="'Player ' + (i + 1) + ' name'"
-            :placeholder="'Player ' + (i + 1)"
-            x-model="localPlayers[i]"
-            @input="localPlayers[i] = $event.target.value = $event.target.value.replace(/[^A-Za-z0-9 '_-]/g, '')"
-          />
-          <button
-            type="button"
-            class="outline secondary small"
-            :disabled="localPlayers.length <= 2"
-            @click="if (localPlayers.length > 2) localPlayers.splice(i, 1)"
-            aria-label="Remove player"
-          >×</button>
+          <input type="text"
+                 minlength="1"
+                 maxlength="24"
+                 :aria-label="'Player ' + (i + 1) + ' name'"
+                 :placeholder="'Player ' + (i + 1)"
+                 x-model="localPlayers[i]"
+                 @input="localPlayers[i] = $event.target.value = $event.target.value.replace(/[^A-Za-z0-9 '_-]/g, '')" />
+          <button type="button"
+                  class="outline secondary small"
+                  :disabled="localPlayers.length <= 2"
+                  @click="if (localPlayers.length > 2) localPlayers.splice(i, 1)"
+                  aria-label="Remove player">×</button>
         </div>
       </template>
       <div class="section-header">
-        <button
-          type="button"
-          class="outline secondary small"
-          :disabled="localPlayers.length >= 12"
-          @click="addLocalPlayer()"
-        >+ Add Player</button>
-        <button
-          type="button"
-          hx-post="room/create"
-          hx-target="#content"
-          hx-swap="innerHTML transition:true"
-          :hx-vals="JSON.stringify({ difficulty: difficulty, players: JSON.stringify(localPlayers), visibility: 'local' })"
-        >Start with <span x-text="localPlayers.length"></span> players</button>
+        <button type="button" class="outline secondary small" :disabled="localPlayers.length >= 12" @click="addLocalPlayer()">
+          + Add Player
+        </button>
+        <button type="button"
+                hx-post="room/create"
+                hx-target="#content"
+                hx-swap="innerHTML transition:true"
+                :hx-vals="JSON.stringify({ difficulty: difficulty, players: JSON.stringify(localPlayers), visibility: 'local' })">
+          Start with <span x-text="localPlayers.length"></span> players
+        </button>
       </div>
     </article>
   </div>
@@ -188,46 +178,40 @@
   {# Join by room code #}
   <label for="join-code-input">Join a room</label>
   <div role="group" class="mb">
-    <input
-      type="text"
-      id="join-code-input"
-      minlength="1"
-      maxlength="6"
-      pattern="[A-Za-z0-9]{1,6}"
-      title="Up to 6 letters or numbers"
-      placeholder="Room code"
-      x-model="roomCodeInput"
-      @input="roomCodeInput = $event.target.value = $event.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
-    />
-    <button
-      type="button"
-      hx-post="room/join"
-      hx-target="#content"
-      hx-swap="innerHTML transition:true"
-      :hx-vals="JSON.stringify({ room_code: roomCodeInput, player_name: playerName })"
-      :disabled="!roomCodeInput"
-    >Join</button>
+    <input type="text"
+           id="join-code-input"
+           minlength="1"
+           maxlength="6"
+           pattern="[A-Za-z0-9]{1,6}"
+           title="Up to 6 letters or numbers"
+           placeholder="Room code"
+           x-model="roomCodeInput"
+           @input="roomCodeInput = $event.target.value = $event.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
+    <button type="button"
+            hx-post="room/join"
+            hx-target="#content"
+            hx-swap="innerHTML transition:true"
+            :hx-vals="JSON.stringify({ room_code: roomCodeInput, player_name: playerName })"
+            :disabled="!roomCodeInput">Join</button>
   </div>
 
   {# Live activity — moved up for discoverability #}
   {% if active_games or waiting_counts %}
     <div class="pill-row">
       {% for g in active_games %}
-        <button
-          type="button"
-          class="outline secondary small"
-          hx-post="room/join"
-          hx-target="#content"
-          hx-swap="innerHTML transition:true"
-          :hx-vals="JSON.stringify({ room_code: '{{ g.code }}', player_name: playerName || 'Spectator', spectate: '1' })"
-        ><span class="activity-dot" aria-hidden="true"></span> {{ g.difficulty | capitalize }} ({{ g.players }}) · Watch</button>
+        <button type="button"
+                class="outline secondary small"
+                hx-post="room/join"
+                hx-target="#content"
+                hx-swap="innerHTML transition:true"
+                :hx-vals="JSON.stringify({ room_code: '{{ g.code }}', player_name: playerName || 'Spectator', spectate: '1' })">
+          <span class="activity-dot" aria-hidden="true"></span> {{ g.difficulty | capitalize }} ({{ g.players }}) · Watch
+        </button>
       {% endfor %}
       {% if waiting_counts %}
         <small>
           Searching:
-          {% for d, n in waiting_counts.items() %}
-            <kbd data-tier="{{ d }}">{{ d | capitalize }} ({{ n }})</kbd>
-          {% endfor %}
+          {% for d, n in waiting_counts.items() %}<kbd data-tier="{{ d }}">{{ d | capitalize }} ({{ n }})</kbd>{% endfor %}
         </small>
       {% endif %}
     </div>
@@ -236,19 +220,12 @@
 
 {# Footer nav — tertiary links, de-emphasised #}
 <nav class="grid mb" aria-label="More options" x-show="online">
-  <button
-    type="button"
-    class="outline secondary"
-    @click="location.hash = 'leaderboard'"
-  >Leaderboard</button>
-  <button
-    type="button"
-    class="outline secondary"
-    x-show="loggedInUser"
-    @click="location.hash = 'account'"
-  >My Profile</button>
+  <button type="button" class="outline secondary" @click="location.hash = 'leaderboard'">Leaderboard</button>
+  <button type="button" class="outline secondary" x-show="loggedInUser" @click="location.hash = 'account'">
+    My Profile
+  </button>
 </nav>
 
 <p class="text-center" x-show="online">
-  <small>{{ total_words }} words across {{ difficulties | length }} difficulties.</small>
+  <small>{{ total_words }} words across {{ difficulties | length }} difficulties. · <a href="#privacy" @click.prevent="location.hash='privacy'">Privacy</a></small>
 </p>
