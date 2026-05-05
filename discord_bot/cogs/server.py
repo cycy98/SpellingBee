@@ -172,9 +172,7 @@ class ServerCog(commands.Cog):
         if row is None:
             embed.description = "That member hasn't linked a Spelling Bee account."
         elif row["is_suspended"]:
-            embed.description = (
-                f"**{row['username']}** is suspended until <t:{row['suspended_until']}:F>"
-            )
+            embed.description = f"**{row['username']}** is suspended until <t:{row['suspended_until']}:F>"
             embed.color = COLOR_LOSS
         else:
             embed.description = f"**{row['username']}** is not suspended."

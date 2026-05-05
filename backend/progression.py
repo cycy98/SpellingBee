@@ -79,7 +79,7 @@ def compute_progression(profile: UserStats) -> Progression:
                     EarnedBadge(name=badge.name, icon=badge.icon, description=badge.description),
                 )
         else:
-            assert badge.column is not None  # noqa: S101
+            assert badge.column is not None
             value = getattr(profile, badge.column, 0)
             if value >= badge.threshold:
                 earned.append(

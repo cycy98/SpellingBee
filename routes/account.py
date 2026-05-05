@@ -6,8 +6,6 @@ import asyncio
 import os
 from typing import TYPE_CHECKING, Annotated, Any
 
-_DISCORD_ID = os.environ.get("DISCORD_ID")
-
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
@@ -16,6 +14,8 @@ from backend.auth import ADMIN_USERS, discord_link_code, get_current_user, verif
 from backend.errors import HtmxError
 from backend.progression import compute_progression
 from templating import PICO_THEMES, set_theme, tpl
+
+_DISCORD_ID = os.environ.get("DISCORD_ID")
 
 if TYPE_CHECKING:
     from backend.game import Catalog

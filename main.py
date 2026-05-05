@@ -22,10 +22,12 @@ from backend.errors import HtmxError
 from backend.game import (
     CHAT_BLOCKLIST,
     MAX_CHAT_LEN,
+    MAX_E2EE_CHAT_LEN,
     MAX_LOCAL_PLAYERS,
     MAX_PLAYERS,
     MAX_SESSIONS_PER_IP,
     MAX_WORD_LEN,
+    ROOM_CODE_LEN,
     ROOT,
     WORD_CHARS,
     Catalog,
@@ -109,6 +111,52 @@ def require_room(
         msg = "Room not found."
         raise HtmxError(msg, 404)
     return sess, room
+
+
+async def resolve_session(
+    state: AppState,
+    request: Request,
+    player_name: str,
+    difficulty: str,
+    ip: str,
+    account: str | None = None,
+    highest_tier: str = "",
+) -> Session:
+    """Return the caller's existing session (updating mutable fields) or create a fresh one.
+
+    Existing session is reused when the cookie points to a live, roomless session,
+    or to a session already assigned to a registered account matching `account`.
+    """
+    sid = request.cookies.get("session_id")
+    sess = state.sessions.get(sid) if sid else None
+    if sess and not sess.room_code:
+        sess.player_name = player_name
+        sess.difficulty = difficulty
+        sess.ip = ip
+        if account:
+            sess.account_username = account
+        if highest_tier:
+            sess.highest_tier = highest_tier
+        return sess
+    return state.create_session(player_name, difficulty, ip, account=account, highest_tier=highest_tier)
+
+
+def _session_already_in_room(
+    state: AppState,
+    room: Room,
+    request: Request,
+    account: str | None,
+) -> Session | None:
+    """Return an existing session that is already seated in this room, or None."""
+    sid = request.cookies.get("session_id")
+    if sid and sid in room.sessions:
+        return state.sessions.get(sid)
+    if account:
+        for s in room.sessions:
+            existing = state.sessions.get(s)
+            if existing and existing.account_username == account:
+                return existing
+    return None
 
 
 def check_creation_limits(state: AppState, request: Request) -> None:
@@ -472,9 +520,7 @@ async def guess(request: Request) -> HTMLResponse:  # noqa: PLR0915
         if result.correct and sess.account_username and state.catalog:
             t = result.tier
             diffs = state.catalog.difficulties
-            if t in diffs and (
-                not sess.highest_tier or diffs.index(t) > diffs.index(sess.highest_tier)
-            ):
+            if t in diffs and (not sess.highest_tier or diffs.index(t) > diffs.index(sess.highest_tier)):
                 sess.highest_tier = t
         await record_guess_stats(
             sess.account_username,
@@ -514,7 +560,10 @@ async def room_create(request: Request) -> Response:
 
     ip = client_ip(request)
     user = get_current_user(request)
-    code = state.make_room_code()
+    try:
+        code = state.make_room_code()
+    except RuntimeError:
+        return toast_error("Server is at capacity. Try again soon.", 503)
 
     if visibility == "local":
         try:
@@ -530,12 +579,8 @@ async def room_create(request: Request) -> Response:
         all_sids: list[str] = []
         first_sess: Session | None = None
         for i, name in enumerate(names[:MAX_LOCAL_PLAYERS]):
-            sess = state.add_player_to_room(
-                room,
-                clean_name(name, f"Player {i + 1}"),
-                difficulty,
-                ip,
-            )
+            sess = state.create_session(clean_name(name, f"Player {i + 1}"), difficulty, ip)
+            state.add_player_to_room(room, sess)
             all_sids.append(sess.id)
             if first_sess is None:
                 first_sess = sess
@@ -544,9 +589,9 @@ async def room_create(request: Request) -> Response:
         active_game = room.current_game
         active_sid = active_game.active_sid() if active_game else None
         viewer = (state.sessions.get(active_sid) if active_sid else None) or first_sess
-        assert viewer is not None  # noqa: S101
+        assert viewer is not None
         resp = await tpl(request, "fragments/room.html", build_room_ctx(state, room, viewer))
-        assert first_sess is not None  # noqa: S101
+        assert first_sess is not None
         set_session_cookie(resp, first_sess.id)
         resp.set_cookie("local_sessions", ",".join(all_sids), **_session_cookie_kwargs())
         return resp
@@ -558,14 +603,16 @@ async def room_create(request: Request) -> Response:
     room = state.make_room(code, difficulty, visibility)
     state.rooms[code] = room
     highest_tier = await load_highest_tier(user, state.catalog.difficulties) if user else ""
-    sess = state.add_player_to_room(
-        room,
+    sess = await resolve_session(
+        state,
+        request,
         player_name,
         difficulty,
         ip,
         account=user,
         highest_tier=highest_tier,
     )
+    state.add_player_to_room(room, sess)
 
     if visibility == "solo":
         room.start_game()
@@ -576,12 +623,16 @@ async def room_create(request: Request) -> Response:
 
 
 @app.post("/room/join", response_class=HTMLResponse)
-async def room_join(request: Request) -> Response:
+async def room_join(request: Request) -> Response:  # noqa: PLR0911
     state: AppState = request.app.state.srv
     check_creation_limits(state, request)
 
+    ip = client_ip(request)
+    if not state.check_rate(ip, "join_room"):
+        return toast_error("Too many join attempts. Try again shortly.", 429)
+
     form = await request.form()
-    code = re.sub(r"[^A-Z0-9]", "", str(form.get("room_code", "")).upper())[:6]
+    code = re.sub(r"[^A-Z0-9]", "", str(form.get("room_code", "")).upper())[:ROOM_CODE_LEN]
     player_name = clean_name(str(form.get("player_name", "")))
     spectate = str(form.get("spectate", "")) == "1"
 
@@ -597,17 +648,20 @@ async def room_join(request: Request) -> Response:
     user = get_current_user(request)
     if not spectate and await is_name_reserved(player_name, user):
         return toast_error("That name belongs to a registered account.")
-    ip = client_ip(request)
+
     highest_tier = await load_highest_tier(user, state.catalog.difficulties) if user else ""
-    sess = state.add_player_to_room(
-        room,
+    sess = _session_already_in_room(state, room, request, user) or await resolve_session(
+        state,
+        request,
         player_name,
         room.difficulty,
         ip,
         account=user,
         highest_tier=highest_tier,
-        spectate=spectate,
     )
+    if sess.room_code and sess.room_code != code:
+        return toast_error("You're already in another room.")
+    state.add_player_to_room(room, sess, spectate=spectate)
     if not spectate:
         room.begin_if_ready()
     state.room_changed(code)
@@ -644,11 +698,7 @@ async def public_join(request: Request) -> HTMLResponse:
     # Find existing public room for this difficulty
     target_room: Room | None = None
     for r in list(state.rooms.values()):
-        if (
-            r.visibility == "public"
-            and r.difficulty == difficulty
-            and len(r.sessions) < MAX_PLAYERS
-        ):
+        if r.visibility == "public" and r.difficulty == difficulty and len(r.sessions) < MAX_PLAYERS:
             await state.finalize_mutation(r.code, r.tick())
             if r.code in state.rooms and not r.winner:
                 target_room = r
@@ -660,20 +710,26 @@ async def public_join(request: Request) -> HTMLResponse:
         if target_room is None:
             return toast_error("No active game to watch.")
     elif target_room is None:
-        code = state.make_room_code()
+        try:
+            code = state.make_room_code()
+        except RuntimeError:
+            return toast_error("Server is at capacity. Try again soon.", 503)
         target_room = state.make_room(code, difficulty, "public")
         state.rooms[code] = target_room
 
     highest_tier = await load_highest_tier(user, state.catalog.difficulties)
-    sess = state.add_player_to_room(
-        target_room,
+    sess = _session_already_in_room(state, target_room, request, user) or await resolve_session(
+        state,
+        request,
         user,
         difficulty,
         ip,
         account=user,
         highest_tier=highest_tier,
-        spectate=spectate,
     )
+    if sess.room_code and sess.room_code != target_room.code:
+        return toast_error("You're already in another room.")
+    state.add_player_to_room(target_room, sess, spectate=spectate)
     if not spectate:
         target_room.begin_if_ready()
     state.room_changed(target_room.code)
@@ -758,9 +814,7 @@ def build_room_ctx(state: AppState, room: Room, viewer: Session) -> dict[str, An
         ctx["part_of_speech"] = word_data["part_of_speech"]
 
         ctx["audio_url"] = (
-            f"audios/{word_data['word'].lower()}.mp3"
-            if state.catalog.has_audio(word_data["word"])
-            else None
+            f"audios/{word_data['word'].lower()}.mp3" if state.catalog.has_audio(word_data["word"]) else None
         )
         ctx["audio_duration"] = game.word_audio_duration
         ctx["word_served_at"] = game.word_served_at
@@ -848,18 +902,23 @@ async def room_stream(request: Request, code: str):
                 yield {"event": "refresh", "data": html}
             while code in state.rooms:
                 msg = await q.get()
-                # Drain queue, keeping only the latest per event type
-                latest = {msg["event"]: msg}
+                # Drain queue: deduplicate stateful events (refresh, draft), accumulate ordered events (chat)
+                batch: list[dict] = [msg]
                 while not q.empty():
-                    m = q.get_nowait()
-                    latest[m["event"]] = m
-                for event_type, m in latest.items():
-                    if event_type == "refresh":
-                        html = await _render_room_sse(state, sess, code, request, user)
-                        if html:
-                            yield {"event": "refresh", "data": html}
-                    else:
-                        yield m
+                    batch.append(q.get_nowait())
+                need_refresh = any(m["event"] == "refresh" for m in batch)
+                if need_refresh:
+                    # Full re-render includes all chat; skip individual chat events
+                    html = await _render_room_sse(state, sess, code, request, user)
+                    if html:
+                        yield {"event": "refresh", "data": html}
+                else:
+                    latest_draft = next((m for m in reversed(batch) if m["event"] == "draft"), None)
+                    if latest_draft:
+                        yield latest_draft
+                    for m in batch:
+                        if m["event"] == "chat":
+                            yield m
         finally:
             state.subscribers[code].discard(q)
             if code in state.subscribers and not state.subscribers[code]:
@@ -892,12 +951,17 @@ async def room_chat(request: Request, code: str) -> HTMLResponse:
     sess, room = require_room(state, request, code, "chat")
 
     form = await request.form()
-    msg = "".join(c for c in str(form.get("message", "")) if c.isprintable()).strip()[:MAX_CHAT_LEN]
+    raw = str(form.get("message", ""))
+    if raw.startswith("E1|"):
+        msg = raw[:MAX_E2EE_CHAT_LEN]
+    else:
+        msg = "".join(c for c in raw if c.isprintable()).strip()[:MAX_CHAT_LEN]
     if msg and msg.lower() not in CHAT_BLOCKLIST:
-        room.add_chat(
-            {"player": sess.player_name, "message": msg, "sid": sess.id, "ts": time.time()},
-        )
-        state.room_changed(code)
+        msg_data = {"player": sess.player_name, "message": msg, "sid": sess.id, "ts": time.time()}
+        room.add_chat(msg_data)
+        template = templates.env.get_template("fragments/chat_message.html")
+        html = await asyncio.to_thread(template.render, msg=msg_data)
+        state.chat_changed(code, html)
 
     return HTMLResponse("")
 

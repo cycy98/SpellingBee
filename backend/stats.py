@@ -171,8 +171,7 @@ async def get_study_list(username: str, catalog: Catalog | None = None) -> list[
     )
     all_words: dict[str, Any] = catalog.all_words if catalog else {}
     return [
-        StudyItem(r["word"], int(r["n"]), all_words.get(r["word"], {}).get("definition", ""))
-        for r in rows
+        StudyItem(r["word"], int(r["n"]), all_words.get(r["word"], {}).get("definition", "")) for r in rows
     ]
 
 
@@ -247,8 +246,7 @@ async def get_leaderboard(
     tb = "" if sort == "elo" else ", elo DESC"
     if guild_id:
         rows = await db.fetchall(
-            f"SELECT {cols} FROM user_stats WHERE username IN {_GUILD_SUBQ}"
-            f" ORDER BY {sort} DESC{tb} LIMIT ?",
+            f"SELECT {cols} FROM user_stats WHERE username IN {_GUILD_SUBQ} ORDER BY {sort} DESC{tb} LIMIT ?",
             (guild_id, limit),
         )
     else:
@@ -383,8 +381,7 @@ async def fetch_account_page(username: str) -> dict:
         wpm_rows,
     ) = await asyncio.gather(
         db.fetchall(
-            "SELECT word, correct, wpm, tier, ts FROM guess_log"
-            " WHERE username=? ORDER BY ts DESC LIMIT 20",
+            "SELECT word, correct, wpm, tier, ts FROM guess_log WHERE username=? ORDER BY ts DESC LIMIT 20",
             (username,),
         ),
         db.fetchone(
@@ -399,8 +396,7 @@ async def fetch_account_page(username: str) -> dict:
             (username,),
         ),
         db.fetchall(
-            "SELECT tier, attempts, accuracy, best_wpm"
-            " FROM user_tier_stats WHERE username=? ORDER BY tier",
+            "SELECT tier, attempts, accuracy, best_wpm FROM user_tier_stats WHERE username=? ORDER BY tier",
             (username,),
         ),
         db.fetchall(
@@ -471,15 +467,11 @@ async def fetch_versus(player: str, opponent: str) -> dict:
         "h2h": h2h,
         "stake": stake,
         "clutch_player": {
-            "rate": float(clutch_row_p["rate"])
-            if clutch_row_p and clutch_row_p["rate"] is not None
-            else 0.0,
+            "rate": float(clutch_row_p["rate"]) if clutch_row_p and clutch_row_p["rate"] is not None else 0.0,
             "total": int(clutch_row_p["total"]) if clutch_row_p else 0,
         },
         "clutch_opponent": {
-            "rate": float(clutch_row_o["rate"])
-            if clutch_row_o and clutch_row_o["rate"] is not None
-            else 0.0,
+            "rate": float(clutch_row_o["rate"]) if clutch_row_o and clutch_row_o["rate"] is not None else 0.0,
             "total": int(clutch_row_o["total"]) if clutch_row_o else 0,
         },
     }
@@ -507,8 +499,7 @@ async def fetch_word_card(
     }
     # race leaderboard
     race_rows = await db.fetchall(
-        "SELECT username, wpm, ts FROM guess_log"
-        " WHERE word=? AND correct=1 ORDER BY wpm DESC LIMIT ?",
+        "SELECT username, wpm, ts FROM guess_log WHERE word=? AND correct=1 ORDER BY wpm DESC LIMIT ?",
         (word, 5),
     )
     race = [WordRaceEntry(r["username"], float(r["wpm"]), int(r["ts"])) for r in race_rows]

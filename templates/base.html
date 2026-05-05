@@ -170,8 +170,13 @@
             // Persisted across room updates (room state morphs via SSE,
             // which would wipe these if they lived in room.html's local x-data)
             roomLocked: false,
+            viewerSid: '',
             guessText: '',
             chatMsg: '',
+            _e2eeKey: null,
+            roomSeed: '',
+            roomIsPrivate: false,
+            inviteCopied: false,
             sideTab: localStorage.getItem('sbSideTab') || 'players',
             showPassPlay: localStorage.getItem('sbShowPassPlay') === 'true',
 
@@ -192,6 +197,16 @@
                 window.addEventListener('htmx:afterSettle', () => {
                     const el = document.querySelector('.chat-messages');
                     if (el) el.scrollTop = el.scrollHeight;
+                    if (!this.roomCode) return;
+                    for (const p of document.querySelectorAll('.chat-msg[data-sid]')) {
+                        if (p.dataset.sid === this.viewerSid) p.classList.add('amber');
+                        p.removeAttribute('data-sid');
+                    }
+                    for (const p of document.querySelectorAll('.chat-msg[data-ct]')) {
+                        const span = p.querySelector('.chat-text');
+                        if (!span || span.dataset.decrypted) continue;
+                        this.decryptChat(p.dataset.ct).then(t => { span.textContent = t; span.dataset.decrypted = '1'; });
+                    }
                 });
                 window.addEventListener('htmx:sseError', async () => {
                     if (!this.roomCode) return;
@@ -205,7 +220,22 @@
                     if (e.detail?.user && this.nameTracksLogin) this.playerName = e.detail.user;
                 });
                 this.$watch('playerName', (val) => localStorage.setItem('sbPlayerName', val));
-                this.$watch('roomCode', (code) => { if (code) location.hash = `room/${code}`; });
+                this.$watch('roomCode', (code) => {
+                    this._e2eeKey = null;
+                    this.roomSeed = '';
+                    if (!code || !this.roomIsPrivate) {
+                        if (code) location.hash = `room/${code}`;
+                        return;
+                    }
+                    let seed = sessionStorage.getItem(`e2eeKey_${code}`);
+                    if (!seed) {
+                        const _a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                        seed = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => _a[b % 36]).join('');
+                        sessionStorage.setItem(`e2eeKey_${code}`, seed);
+                    }
+                    this.roomSeed = seed;
+                    location.hash = `room/${code};k=${seed}`;
+                });
                 this.$watch('volume', (val) => localStorage.setItem('sbVolume', val));
                 this.$watch('muted', (val) => localStorage.setItem('sbMuted', val));
                 this.$watch('difficulty', (val) => localStorage.setItem('sbDifficulty', val));
@@ -329,12 +359,13 @@
                 });
             },
 
-            sendChat(roomCode) {
+            async sendChat(roomCode) {
                 if (!this.chatMsg.trim()) return;
                 if (this.checkProfanity(this.chatMsg, 'message')) return;
                 this.sfx('swoosh');
+                const message = await this.encryptChat(this.chatMsg);
                 htmx.ajax('POST', `room/${roomCode}/chat`, {
-                    values: { message: this.chatMsg },
+                    values: { message },
                     swap: 'none'
                 });
                 this.chatMsg = '';
@@ -366,6 +397,46 @@
             sfx(name) {
                 if (!this.muted) window.tiks?.[name]?.();
             },
+
+            parseRoomCode(value) {
+                const m = value.toUpperCase().match(/^([A-Z0-9]{1,2})(?:-([A-Z0-9]{1,6}))?/);
+                if (!m) return '';
+                const [, code, seed] = m;
+                if (code && seed && seed.length === 6) sessionStorage.setItem(`e2eeKey_${code}`, seed);
+                return code + (seed ? '-' + seed : '');
+            },
+
+            _getE2eeKey() {
+                if (!this._e2eeKey) {
+                    const seed = sessionStorage.getItem(`e2eeKey_${this.roomCode}`);
+                    if (!seed) return Promise.resolve(null);
+                    this._e2eeKey = crypto.subtle.importKey('raw', new TextEncoder().encode(seed), 'PBKDF2', false, ['deriveKey'])
+                        .then(hk => crypto.subtle.deriveKey(
+                            { name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(this.roomCode), iterations: 200_000 },
+                            hk, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+                        ));
+                }
+                return this._e2eeKey;
+            },
+
+            async encryptChat(plain) {
+                const key = await this._getE2eeKey();
+                if (!key) return plain;
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain)));
+                const buf = new Uint8Array(12 + ct.length);
+                buf.set(iv); buf.set(ct, 12);
+                return 'E1|' + btoa(String.fromCharCode(...buf)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            },
+
+            async decryptChat(body) {
+                const key = await this._getE2eeKey();
+                if (!key) return '[no key]';
+                try {
+                    const bytes = Uint8Array.from(atob(body.slice(3).replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+                    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(0, 12) }, key, bytes.slice(12)));
+                } catch { return '[decryption failed]'; }
+            },
         }
     }
     function sbNavigate(hash) {
@@ -386,12 +457,18 @@
             }
             case 'privacy':
                 htmx.ajax('GET', 'privacy', swap); break;
-            case 'room':
-                if (args[0]) {
+            case 'room': {
+                const raw = args[0] || '';
+                const sep = raw.indexOf(';k=');
+                const code = sep >= 0 ? raw.slice(0, sep) : raw;
+                const key = sep >= 0 ? raw.slice(sep + 3) : null;
+                if (key && code) sessionStorage.setItem(`e2eeKey_${code}`, key);
+                if (code) {
                     const cur = Alpine.$data(document.querySelector('[x-data]'))?.roomCode;
-                    if (cur !== args[0]) htmx.ajax('GET', `room/${args[0]}`, swap);
+                    if (cur !== code) htmx.ajax('GET', `room/${code}`, swap);
                 }
                 break;
+            }
             default:
                 htmx.ajax('GET', '', swap);
         }

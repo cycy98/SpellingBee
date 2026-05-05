@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import secrets
+import itertools
+import random
 import string
 import time
 from collections import defaultdict
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.game import (
     RATE_LIMITS,
+    ROOM_CODE_LEN,
     STALE_MINUTES,
     Catalog,
     Ranking,
@@ -70,10 +72,13 @@ class AppState:
 
     def make_room_code(self) -> str:
         chars = string.ascii_uppercase + string.digits
-        while True:
-            code = "".join(secrets.choice(chars) for _ in range(6))
-            if code not in self.rooms:
-                return code
+        available = [
+            "".join(t) for t in itertools.product(chars, repeat=ROOM_CODE_LEN) if "".join(t) not in self.rooms
+        ]
+        if not available:
+            msg = "all room codes exhausted"
+            raise RuntimeError(msg)
+        return random.choice(available)
 
     def check_rate(self, ip: str, action: str) -> bool:
         limit, window = RATE_LIMITS[action]
@@ -88,31 +93,33 @@ class AppState:
     def count_sessions_for_ip(self, ip: str) -> int:
         return sum(1 for s in self.sessions.values() if s.ip == ip)
 
-    def add_player_to_room(
+    def create_session(
         self,
-        room: Room,
         player_name: str,
         difficulty: str,
         ip: str,
         account: str | None = None,
         highest_tier: str = "",
-        spectate: bool = False,
     ) -> Session:
         sid = make_session_id()
         sess = Session(
             id=sid,
             player_name=player_name,
             difficulty=difficulty,
-            room_code=room.code,
             account_username=account,
             ip=ip,
         )
         if highest_tier:
             sess.highest_tier = highest_tier
         self.sessions[sid] = sess
-        room.sessions.append(sid)
+        return sess
+
+    def add_player_to_room(self, room: Room, sess: Session, spectate: bool = False) -> Session:
+        sess.room_code = room.code
+        if sess.id not in room.sessions:
+            room.sessions.append(sess.id)
         if spectate:
-            room.spectators.add(sid)
+            room.spectators.add(sess.id)
         room.last_activity = time.time()
         return sess
 
@@ -137,9 +144,7 @@ class AppState:
         for c in stale_rooms:
             self._destroy_room(c)
         stale_ips = [
-            ip
-            for ip, actions in self.rate_buckets.items()
-            if all(not ts for ts in actions.values())
+            ip for ip, actions in self.rate_buckets.items() if all(not ts for ts in actions.values())
         ]
         for ip in stale_ips:
             del self.rate_buckets[ip]
@@ -149,6 +154,11 @@ class AppState:
         for q in self.subscribers.get(code, set()):
             q.put_nowait({"event": "refresh", "data": ""})
         self._arm_room_timer(code)
+
+    def chat_changed(self, code: str, html: str) -> None:
+        """Push a rendered chat message to SSE subscribers without a full refresh."""
+        for q in self.subscribers.get(code, set()):
+            q.put_nowait({"event": "chat", "data": html})
 
     def draft_changed(self, code: str, text: str) -> None:
         """Push draft text to SSE subscribers without a full refresh."""
