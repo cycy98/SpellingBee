@@ -15,6 +15,9 @@ dependencies = [
 
 [project.optional-dependencies]
 audio = ["mutagen>=1.47"]
+linux = [
+    "landlock>=1.0.0.dev5",
+]
 
 [tool.ruff]
 line-length = 110

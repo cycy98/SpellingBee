@@ -698,6 +698,15 @@ wheels = [
 ]
 
 [[package]]
+name = "landlock"
+version = "1.0.0.dev5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/e2/ad65eb9afcde46eb055dce9b7003b372b1de19da94acf800a2e352ba5ae1/landlock-1.0.0.dev5.tar.gz", hash = "sha256:e82d511992be24986c51e3c9d2bfcc956833c2f82f95004216262aa4e2d50a2e", size = 7115, upload-time = "2025-05-03T16:51:57.738Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/c0/5cff902d2ff3df3db965e0b36208017569abf4a93ed30fe9ffafbf171c95/landlock-1.0.0.dev5-py3-none-any.whl", hash = "sha256:6d72357f5dc23d64b3b3d976672b61af736281b8d34a5825c1a61b602f2df815", size = 7969, upload-time = "2025-05-03T16:51:56.798Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1314,6 +1323,9 @@ dependencies = [
 audio = [
     { name = "mutagen" },
 ]
+linux = [
+    { name = "landlock" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1327,11 +1339,12 @@ requires-dist = [
     { name = "discord-py", specifier = ">=2.7.1" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.3" },
     { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "landlock", marker = "extra == 'linux'", specifier = ">=1.0.0.dev5" },
     { name = "mutagen", marker = "extra == 'audio'", specifier = ">=1.47" },
     { name = "python-multipart", specifier = ">=0.0.26" },
     { name = "sse-starlette", specifier = ">=3.3.4" },
 ]
-provides-extras = ["audio"]
+provides-extras = ["audio", "linux"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "djlint", specifier = ">=1.36.4" }]

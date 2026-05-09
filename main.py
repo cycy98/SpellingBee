@@ -49,6 +49,11 @@ from routes.account import router as account_router
 from routes.auth import router as auth_router
 from templating import client_ip, templates, tpl
 
+try:
+    from landlock import Ruleset
+except ImportError:
+    Ruleset = None
+
 if TYPE_CHECKING:
     from starlette.responses import Response as StarletteResponse
 
@@ -1075,6 +1080,17 @@ async def room_restart(request: Request, code: str) -> Response:
 
 if __name__ == "__main__":
     import uvicorn
+
+    if Ruleset:
+        # the ruleset by default disallows all filesystem access
+        rs = Ruleset()
+        # explicitly allow access to the local directory hierarchy
+        rs.allow(".")
+        # turn on protections
+        rs.apply()
+        logging.info("Succeeded sandboxing.")
+    else:
+        logging.warning("Skipping sandboxing.")
 
     uvicorn.run(
         app,
