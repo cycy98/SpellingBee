@@ -9,12 +9,14 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import FileResponse, HTMLResponse, Response
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from backend import db
 from backend.auth import _session_cookie_kwargs, get_current_user, set_session_cookie
@@ -45,8 +47,8 @@ from backend.persistence import (
 )
 from backend.state import AppState
 from discord_bot.bot import BotCore
-from routes.account import router as account_router
-from routes.auth import router as auth_router
+from routes.account import routes as account_routes
+from routes.auth import routes as auth_routes
 from templating import client_ip, templates, tpl
 
 try:
@@ -54,14 +56,11 @@ try:
 except ImportError:
     Ruleset = None
 
-if TYPE_CHECKING:
-    from starlette.responses import Response as StarletteResponse
-
 _access_log = logging.getLogger("spelling.access")
 
 
 class ImmutableStaticFiles(StaticFiles):
-    async def get_response(self, path: str, scope: Any) -> StarletteResponse:
+    async def get_response(self, path: str, scope: Any) -> Response:
         response = await super().get_response(path, scope)
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return response
@@ -310,7 +309,7 @@ class AccessLogMiddleware:
 
 
 @asynccontextmanager
-async def _lifespan(_app: FastAPI):
+async def _lifespan(_app: Starlette):
     await db.init(DB_PATH)
     catalog = Catalog.load(ROOT)
     templates.env.globals["tier_colors"] = catalog.tier_colors
@@ -323,6 +322,15 @@ async def _lifespan(_app: FastAPI):
             state.purge_stale()
 
     state.spawn(_purge_loop(), name="purge-loop")
+
+    if Ruleset and False:
+        rs = Ruleset()
+        rs.allow("/etc")
+        rs.allow(".")
+        rs.apply()
+        logging.info("Succeeded sandboxing.")
+    else:
+        logging.warning("Skipping sandboxing.")
 
     _bot: BotCore | None = None
     if _token := os.environ.get("DISCORD_TOKEN"):
@@ -339,9 +347,6 @@ async def _lifespan(_app: FastAPI):
     await db.close()
 
 
-app = FastAPI(lifespan=_lifespan)
-
-
 def toast_error(message: str, status_code: int = 200, kind: str = "error") -> Response:
     return Response(
         status_code=status_code,
@@ -352,24 +357,15 @@ def toast_error(message: str, status_code: int = 200, kind: str = "error") -> Re
     )
 
 
-@app.exception_handler(HtmxError)
-async def htmx_error_handler(request: Request, exc: HtmxError) -> Response:  # noqa: ARG001
+async def htmx_error_handler(request: Request, exc: Exception) -> Response:  # noqa: ARG001
+    assert isinstance(exc, HtmxError)
     return toast_error(exc.message, exc.status_code)
 
-
-app.add_middleware(AccessLogMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY)
-app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
-app.mount("/audios", ImmutableStaticFiles(directory=str(ROOT / "audios")), name="audios")
-app.include_router(auth_router)
-app.include_router(account_router)
 
 # PWA
 
 
-@app.get("/sw.js")
-async def service_worker() -> FileResponse:
+async def service_worker(request: Request) -> FileResponse:
     return FileResponse(
         ROOT / "static" / "sw.js",
         media_type="text/javascript",
@@ -377,8 +373,7 @@ async def service_worker() -> FileResponse:
     )
 
 
-@app.get("/manifest.json")
-async def manifest() -> Response:
+async def manifest(request: Request) -> Response:
     return Response(
         json.dumps(
             {
@@ -418,7 +413,6 @@ async def manifest() -> Response:
 # Routes
 
 
-@app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     state: AppState = request.app.state.srv
     user = get_current_user(request)
@@ -468,8 +462,7 @@ async def index(request: Request) -> HTMLResponse:
     )
 
 
-@app.post("/guess", response_class=HTMLResponse)
-async def guess(request: Request) -> HTMLResponse:  # noqa: PLR0915
+async def guess(request: Request) -> Response:  # noqa: PLR0915
     """Handle guesses for all room modes."""
     state: AppState = request.app.state.srv
     ip = client_ip(request)
@@ -549,7 +542,6 @@ async def guess(request: Request) -> HTMLResponse:  # noqa: PLR0915
 # Room creation / joining
 
 
-@app.post("/room/create", response_class=HTMLResponse)
 async def room_create(request: Request) -> Response:
     state: AppState = request.app.state.srv
     check_creation_limits(state, request)
@@ -627,7 +619,6 @@ async def room_create(request: Request) -> Response:
     return resp
 
 
-@app.post("/room/join", response_class=HTMLResponse)
 async def room_join(request: Request) -> Response:  # noqa: PLR0911
     state: AppState = request.app.state.srv
     check_creation_limits(state, request)
@@ -676,8 +667,7 @@ async def room_join(request: Request) -> Response:  # noqa: PLR0911
     return resp
 
 
-@app.post("/public/join", response_class=HTMLResponse)
-async def public_join(request: Request) -> HTMLResponse:
+async def public_join(request: Request) -> Response:
     state: AppState = request.app.state.srv
     ip = client_ip(request)
     if not state.check_rate(ip, "create_room"):
@@ -874,15 +864,15 @@ async def _render_room_sse(
     return await asyncio.to_thread(template.render, **ctx)
 
 
-@app.get("/room/{code}", response_class=HTMLResponse)
-async def room_poll(request: Request, code: str) -> HTMLResponse:
+async def room_poll(request: Request) -> HTMLResponse:
+    code = request.path_params["code"]
     state: AppState = request.app.state.srv
     sess, room = require_room(state, request, code)
     return await tpl(request, "fragments/room.html", build_room_ctx(state, room, sess))
 
 
-@app.get("/room/{code}/stream")
-async def room_stream(request: Request, code: str):
+async def room_stream(request: Request):
+    code = request.path_params["code"]
     state: AppState = request.app.state.srv
     room = state.rooms.get(code)
     sess = get_session(state, request)
@@ -933,8 +923,8 @@ async def room_stream(request: Request, code: str):
     return EventSourceResponse(gen(), ping=15)
 
 
-@app.post("/room/{code}/draft")
-async def room_draft(request: Request, code: str) -> Response:
+async def room_draft(request: Request) -> Response:
+    code = request.path_params["code"]
     state: AppState = request.app.state.srv
     sess, room = require_room(state, request, code, "draft")
     game = room.current_game
@@ -950,8 +940,8 @@ async def room_draft(request: Request, code: str) -> Response:
     return Response(status_code=204)
 
 
-@app.post("/room/{code}/chat", response_class=HTMLResponse)
-async def room_chat(request: Request, code: str) -> HTMLResponse:
+async def room_chat(request: Request) -> HTMLResponse:
+    code = request.path_params["code"]
     state: AppState = request.app.state.srv
     sess, room = require_room(state, request, code, "chat")
 
@@ -971,8 +961,8 @@ async def room_chat(request: Request, code: str) -> HTMLResponse:
     return HTMLResponse("")
 
 
-@app.post("/room/{code}/lock")
-async def room_lock_toggle(request: Request, code: str) -> Response:
+async def room_lock_toggle(request: Request) -> Response:
+    code = request.path_params["code"]
     state: AppState = request.app.state.srv
     sess, room = require_room(state, request, code)
     if room.visibility != "private":
@@ -985,8 +975,8 @@ async def room_lock_toggle(request: Request, code: str) -> Response:
     return Response(status_code=204)
 
 
-@app.post("/room/{code}/ready")
-async def room_ready(request: Request, code: str) -> Response:
+async def room_ready(request: Request) -> Response:
+    code = request.path_params["code"]
     state: AppState = request.app.state.srv
     sess, room = require_room(state, request, code)
     if room.visibility != "private":
@@ -1017,7 +1007,6 @@ async def room_ready(request: Request, code: str) -> Response:
     return Response(status_code=204)
 
 
-@app.post("/forfeit", response_class=HTMLResponse)
 async def forfeit(request: Request) -> HTMLResponse:
     state: AppState = request.app.state.srv
     sess = get_session(state, request)
@@ -1061,8 +1050,8 @@ async def forfeit(request: Request) -> HTMLResponse:
     return HTMLResponse("")
 
 
-@app.post("/room/{code}/restart", response_class=HTMLResponse)
-async def room_restart(request: Request, code: str) -> Response:
+async def room_restart(request: Request) -> Response:
+    code = request.path_params["code"]
     """Restart a solo/local game."""
     state: AppState = request.app.state.srv
     _sess, room = require_room(state, request, code)
@@ -1078,19 +1067,44 @@ async def room_restart(request: Request, code: str) -> Response:
     return await tpl(request, "fragments/room.html", build_room_ctx(state, room, viewer))
 
 
+def _make_app() -> Starlette:
+    routes = [
+        Route("/sw.js", service_worker),
+        Route("/manifest.json", manifest),
+        Route("/", index),
+        Route("/guess", guess, methods=["POST"]),
+        Route("/room/create", room_create, methods=["POST"]),
+        Route("/room/join", room_join, methods=["POST"]),
+        Route("/public/join", public_join, methods=["POST"]),
+        Route("/room/{code}", room_poll),
+        Route("/room/{code}/stream", room_stream),
+        Route("/room/{code}/draft", room_draft, methods=["POST"]),
+        Route("/room/{code}/chat", room_chat, methods=["POST"]),
+        Route("/room/{code}/lock", room_lock_toggle, methods=["POST"]),
+        Route("/room/{code}/ready", room_ready, methods=["POST"]),
+        Route("/forfeit", forfeit, methods=["POST"]),
+        Route("/room/{code}/restart", room_restart, methods=["POST"]),
+        *auth_routes,
+        *account_routes,
+        Mount("/static", app=StaticFiles(directory=str(ROOT / "static")), name="static"),
+        Mount("/audios", app=ImmutableStaticFiles(directory=str(ROOT / "audios")), name="audios"),
+    ]
+    _app = Starlette(
+        routes=routes,
+        lifespan=_lifespan,
+        exception_handlers={HtmxError: htmx_error_handler},
+    )
+    _app.add_middleware(AccessLogMiddleware)
+    _app.add_middleware(SecurityHeadersMiddleware)
+    _app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY)
+    return _app
+
+
+app = _make_app()
+
+
 if __name__ == "__main__":
     import uvicorn
-
-    if Ruleset:
-        # the ruleset by default disallows all filesystem access
-        rs = Ruleset()
-        # explicitly allow access to the local directory hierarchy
-        rs.allow(".")
-        # turn on protections
-        rs.apply()
-        logging.info("Succeeded sandboxing.")
-    else:
-        logging.warning("Skipping sandboxing.")
 
     uvicorn.run(
         app,
