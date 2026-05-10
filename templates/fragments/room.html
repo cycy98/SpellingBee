@@ -33,4 +33,8 @@
   </ul>
 </nav>
 
-{% include "fragments/room_state.html" %}
+{% if mode not in ('solo', 'local') %}
+  <div hx-ext="sse" sse-connect="room/{{ room.code }}/stream">{% include "fragments/room_state.html" %}</div>
+{% else %}
+  {% include "fragments/room_state.html" %}
+{% endif %}

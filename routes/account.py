@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Any
 
-_DISCORD_ID = os.environ.get("DISCORD_ID")
-
-from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, Response
+from starlette.routing import Route
 
 from backend import db, stats
 from backend.auth import ADMIN_USERS, discord_link_code, get_current_user, verify_password
@@ -17,14 +15,16 @@ from backend.errors import HtmxError
 from backend.progression import compute_progression
 from templating import PICO_THEMES, set_theme, tpl
 
+_DISCORD_ID = os.environ.get("DISCORD_ID")
+
 if TYPE_CHECKING:
+    from starlette.requests import Request
+
     from backend.game import Catalog
 
-router = APIRouter()
 
-
-@router.get("/leaderboard", response_class=HTMLResponse)
-async def leaderboard(request: Request, sort: str = "elo") -> HTMLResponse:
+async def leaderboard(request: Request) -> HTMLResponse:
+    sort = request.query_params.get("sort", "elo")
     if sort not in {"elo", "games", "wins", "correct", "best_wpm", "best_streak"}:
         sort = "elo"
     players = await stats.get_leaderboard(sort=sort, limit=100)
@@ -62,7 +62,6 @@ async def _account_ctx(username: str, catalog: Catalog, row: db.Row) -> dict[str
     }
 
 
-@router.get("/account/export")
 async def export_account(request: Request) -> JSONResponse:
     user = get_current_user(request)
     if not user:
@@ -89,8 +88,8 @@ async def export_account(request: Request) -> JSONResponse:
     return JSONResponse(content=payload, headers=headers)
 
 
-@router.get("/account/{username}", response_class=HTMLResponse)
-async def account_view(request: Request, username: str) -> HTMLResponse:
+async def account_view(request: Request) -> HTMLResponse:
+    username = request.path_params["username"]
     row = await _fetch_user_row(username)
     viewer = get_current_user(request)
     if row["visibility"] == "private" and viewer != username and viewer not in ADMIN_USERS:
@@ -109,12 +108,10 @@ async def account_view(request: Request, username: str) -> HTMLResponse:
     )
 
 
-@router.post("/account/settings", response_class=HTMLResponse)
-async def update_settings(
-    request: Request,
-    theme: Annotated[str, Form()],
-    visibility: Annotated[str, Form()] = "public",
-) -> Response:
+async def update_settings(request: Request) -> Response:
+    form = await request.form()
+    theme = str(form.get("theme", ""))
+    visibility = str(form.get("visibility", "public"))
     user = get_current_user(request)
     if not user:
         msg = "Not logged in."
@@ -134,14 +131,12 @@ async def update_settings(
     return Response(status_code=204, headers={"HX-Refresh": "true"})
 
 
-@router.post("/admin/user/{username}/edit", response_class=HTMLResponse)
-async def admin_edit_user(
-    request: Request,
-    username: str,
-    bio: Annotated[str, Form()] = "",
-    visibility: Annotated[str, Form()] = "public",
-    suspended_until: Annotated[str, Form()] = "",
-) -> HTMLResponse:
+async def admin_edit_user(request: Request) -> HTMLResponse:
+    form = await request.form()
+    username = request.path_params["username"]
+    bio = str(form.get("bio", ""))
+    visibility = str(form.get("visibility", "public"))
+    suspended_until = str(form.get("suspended_until", ""))
     caller = get_current_user(request)
     if caller not in ADMIN_USERS:
         msg = "Forbidden."
@@ -170,8 +165,8 @@ async def admin_edit_user(
     return await tpl(request, "fragments/account.html", ctx)
 
 
-@router.post("/admin/user/{username}/delete")
-async def admin_delete_user(request: Request, username: str) -> Response:
+async def admin_delete_user(request: Request) -> Response:
+    username = request.path_params["username"]
     caller = get_current_user(request)
     if caller not in ADMIN_USERS:
         msg = "Forbidden."
@@ -185,11 +180,9 @@ async def admin_delete_user(request: Request, username: str) -> Response:
     return Response(status_code=200, headers={"HX-Redirect": f"{root}/leaderboard"})
 
 
-@router.post("/account/delete", response_class=HTMLResponse)
-async def delete_account(
-    request: Request,
-    password: Annotated[str, Form()],
-) -> Response:
+async def delete_account(request: Request) -> Response:
+    form = await request.form()
+    password = str(form.get("password", ""))
     user = get_current_user(request)
     if not user:
         msg = "Not logged in."
@@ -206,13 +199,12 @@ async def delete_account(
     return resp
 
 
-@router.get("/privacy", response_class=HTMLResponse)
 async def privacy(request: Request) -> HTMLResponse:
     return await tpl(request, "fragments/privacy.html", {})
 
 
-@router.get("/stats/{username}", response_class=HTMLResponse)
-async def stats_view(request: Request, username: str) -> Response:
+async def stats_view(request: Request) -> Response:
+    username = request.path_params["username"]
     root = request.scope.get("root_path", "")
     return Response(
         status_code=302,
@@ -220,7 +212,6 @@ async def stats_view(request: Request, username: str) -> Response:
     )
 
 
-@router.get("/account", response_class=HTMLResponse)
 async def own_account(request: Request) -> HTMLResponse:
     user = get_current_user(request)
     if not user:
@@ -233,3 +224,17 @@ async def own_account(request: Request) -> HTMLResponse:
         "fragments/account.html",
         {"player": row, **(await _account_ctx(user, catalog, row))},
     )
+
+
+routes = [
+    Route("/leaderboard", leaderboard),
+    Route("/account/export", export_account),
+    Route("/account/settings", update_settings, methods=["POST"]),
+    Route("/account/delete", delete_account, methods=["POST"]),
+    Route("/account/{username}", account_view),
+    Route("/account", own_account),
+    Route("/admin/user/{username}/edit", admin_edit_user, methods=["POST"]),
+    Route("/admin/user/{username}/delete", admin_delete_user, methods=["POST"]),
+    Route("/privacy", privacy),
+    Route("/stats/{username}", stats_view),
+]

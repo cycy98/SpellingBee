@@ -7,14 +7,14 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fastapi.templating import Jinja2Templates
+from starlette.templating import Jinja2Templates
 
 from backend import db
 from backend.auth import ADMIN_USERS, get_current_user
 
 if TYPE_CHECKING:
-    from fastapi import Request
-    from fastapi.responses import HTMLResponse
+    from starlette.requests import Request
+    from starlette.responses import HTMLResponse
 
 PICO_THEMES = frozenset(
     [

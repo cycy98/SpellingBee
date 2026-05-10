@@ -389,8 +389,7 @@ class CommandsCog(commands.Cog):
         s, lb, hof = d["stats"], d["lb"], d["hof"]
         spot, nem = d["spotlight"], d["nemesis"]
         lines = [
-            f"**Members:** {s.members} · **Avg ELO:** {s.avg_elo or '—'}"
-            f" · **Matches:** {s.total_matches}",
+            f"**Members:** {s.members} · **Avg ELO:** {s.avg_elo or '—'} · **Matches:** {s.total_matches}",
             f"**Health:** {s.active_today} active today · {s.matches_week} matches this week",
         ]
         if lb:
@@ -464,11 +463,7 @@ class CommandsCog(commands.Cog):
         total = h2h.total_games
         win_rate = h2h.player_wins / total if total else 0.0
         gap = abs(h2h.player_elo - h2h.opponent_elo)
-        elo_line = (
-            f"▲{gap:.0f} ELO ahead"
-            if h2h.player_elo >= h2h.opponent_elo
-            else f"▼{gap:.0f} ELO behind"
-        )
+        elo_line = f"▲{gap:.0f} ELO ahead" if h2h.player_elo >= h2h.opponent_elo else f"▼{gap:.0f} ELO behind"
         lines = [
             f"**Record:** {h2h.player_wins}W - {h2h.opponent_wins}L"
             f" ({total} matches · {win_rate:.0%} win rate)",

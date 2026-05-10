@@ -180,18 +180,18 @@
   <div role="group" class="mb">
     <input type="text"
            id="join-code-input"
-           minlength="1"
-           maxlength="6"
-           pattern="[A-Za-z0-9]{1,6}"
-           title="Up to 6 letters or numbers"
-           placeholder="Room code"
+           minlength="2"
+           maxlength="9"
+           pattern="[A-Za-z0-9]{2}(-[A-Za-z0-9]{6})?"
+           title="Room code or invite code (e.g. A1-XYZ789)"
+           placeholder="Room or invite code"
            x-model="roomCodeInput"
-           @input="roomCodeInput = $event.target.value = $event.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
+           @input="roomCodeInput = $event.target.value = parseRoomCode($event.target.value)" />
     <button type="button"
             hx-post="room/join"
             hx-target="#content"
             hx-swap="innerHTML transition:true"
-            :hx-vals="JSON.stringify({ room_code: roomCodeInput, player_name: playerName })"
+            :hx-vals="JSON.stringify({ room_code: roomCodeInput.split('-')[0], player_name: playerName })"
             :disabled="!roomCodeInput">Join</button>
   </div>
 

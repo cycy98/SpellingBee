@@ -1,0 +1,5 @@
+{% set e2ee = msg.message.startswith('E1|') %}
+<p class="chat-msg" data-sid="{{ msg.sid }}"{% if e2ee %} data-ct="{{ msg.message | e }}"{% endif %}>
+  {% if msg.ts %}<span class="chat-ts">{{ msg.ts | relative_time }}</span>{% endif %}
+  <strong>{{ msg.player }}:</strong> <span class="chat-text">{{ '' if e2ee else msg.message }}</span>
+</p>

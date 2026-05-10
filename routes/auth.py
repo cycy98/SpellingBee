@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import re
+from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from starlette.routing import Route
 
 from backend import db
 from backend.auth import (
@@ -18,10 +18,11 @@ from backend.auth import (
 from backend.errors import HtmxError
 from templating import client_ip, tpl
 
-router = APIRouter()
+if TYPE_CHECKING:
+    from starlette.requests import Request
+    from starlette.responses import HTMLResponse
 
 
-@router.post("/register", response_class=HTMLResponse)
 async def register(request: Request) -> HTMLResponse:
     state = request.app.state.srv
     ip = client_ip(request)
@@ -58,7 +59,6 @@ async def register(request: Request) -> HTMLResponse:
     return resp
 
 
-@router.post("/login", response_class=HTMLResponse)
 async def login(request: Request) -> HTMLResponse:
     state = request.app.state.srv
     ip = client_ip(request)
@@ -87,7 +87,6 @@ async def login(request: Request) -> HTMLResponse:
     return resp
 
 
-@router.post("/set-password", response_class=HTMLResponse)
 async def set_password(request: Request) -> HTMLResponse:
     logged_in_user = get_current_user(request)
     if not logged_in_user:
@@ -133,9 +132,16 @@ async def set_password(request: Request) -> HTMLResponse:
     return resp
 
 
-@router.post("/logout", response_class=HTMLResponse)
 async def logout(request: Request) -> HTMLResponse:
     resp = await tpl(request, "fragments/menu.html", {"user": None})
     resp.delete_cookie("auth", path="/")
     resp.headers["HX-Trigger"] = json.dumps({"auth-changed": {"user": None}})
     return resp
+
+
+routes = [
+    Route("/register", register, methods=["POST"]),
+    Route("/login", login, methods=["POST"]),
+    Route("/set-password", set_password, methods=["POST"]),
+    Route("/logout", logout, methods=["POST"]),
+]

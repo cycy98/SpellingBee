@@ -58,6 +58,9 @@ class MatchResult(TypedDict):
 ROOT = Path(__file__).resolve().parent.parent
 MAX_CHAT = 80
 MAX_CHAT_LEN = 150
+MAX_E2EE_CHAT_LEN = 600
+ROOM_CODE_LEN = 2
+ROOM_SEED_LEN = 6
 # Null-family and object-notation strings that appear as bot/test noise but never in real chat
 CHAT_BLOCKLIST = frozenset(
     {
@@ -101,6 +104,7 @@ RATE_LIMITS: dict[str, tuple[int, int]] = {
     "login": (5, 60),
     "register": (3, 60),
     "create_room": (5, 60),
+    "join_room": (10, 60),
     "chat": (10, 30),
     "guess": (60, 60),
     "draft": (60, 60),
@@ -124,9 +128,7 @@ class Catalog:
         self.difficulties = list(self.words)
         self.total_words = sum(len(v) for v in self.words.values())
         self.all_words = {
-            w: {**wdata, "tier": tier}
-            for tier, wdict in self.words.items()
-            for w, wdata in wdict.items()
+            w: {**wdata, "tier": tier} for tier, wdict in self.words.items() for w, wdata in wdict.items()
         }
         self._word_keys = {d: list(ws) for d, ws in self.words.items()}
         self._all_word_keys = list(self.all_words)
@@ -265,7 +267,7 @@ class Game:
         return self.participants.get(sid)
 
     def serve_new_word(self, streak: int = 0) -> None:
-        assert self.catalog is not None, "Game.catalog must be set before serving words"  # noqa: S101
+        assert self.catalog is not None, "Game.catalog must be set before serving words"
         last = self.current_word["word"] if self.current_word else None
         word_data = self.catalog.pick_word(self.difficulty)
         if word_data["word"] == last:
@@ -500,7 +502,7 @@ class Room:
                 player_name=s.player_name,
                 account=s.account_username,
             )
-        assert self.catalog is not None  # noqa: S101
+        assert self.catalog is not None
         game = Game(
             number=self.game_number,
             difficulty=self.difficulty,
