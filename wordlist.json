@@ -465,7 +465,7 @@
         "serendipity": {"part_of_speech": "noun", "definition": "the occurrence of happy or beneficial events by chance", "homophones": []},
         "sesquilinear": {"part_of_speech": "adjective", "definition": "involving one and a half units or dimensions", "homophones": []},
         "sesquipedalian": {"part_of_speech": "adjective", "definition": "using long words", "homophones": []},
-        "sidgwickian": {"part_of_speech": "adjective", "definition": "Relating to a particular English utilitarian and economist", "homophones": []},
+        "sidgwickian": {"part_of_speech": "adjective", "definition": "relating to a particular English utilitarian and economist", "homophones": []},
         "slaughterhouse": {"part_of_speech": "noun", "definition": "a facility where livestock are processed for meat", "homophones": []},
         "soliloquy": {"part_of_speech": "noun", "definition": "an act of speaking one's thoughts aloud when alone or regardless of any hearers", "homophones": []},
         "souvenir": {"part_of_speech": "noun", "definition": "an item of sentimental value, to remember an event or location", "homophones": []},
@@ -595,7 +595,7 @@
         "voicelessdentolabialaffricate": {"part_of_speech": "noun", "definition": "a sound equivalent to a simultanous \"ts\" using the upper lip instead of the upper teeth", "homophones": ["voiceless dento labial affricate", "voiceless dento-labial affricate"]},
         "worcestershire": {"part_of_speech": "proper noun", "definition": "a county in England", "homophones": []},
         "xiphoomphaloischiopagus": {"part_of_speech": "adjective", "definition": "describing conjoined twins joined at three points on the chest", "homophones": []},
-        "zoologicoarchaeologist": {"part_of_speech": "noun", "definition": "A person who studies the animal remains from sites excavated to study their remains", "homophones": ["zoologico-archaeologist", "zoologico-archeologist", "zoologico-archæologist", "zoologicoarcheologist", "zoologicoarchæologist"]},
+        "zoologicoarchaeologist": {"part_of_speech": "noun", "definition": "a person who studies the animal remains from sites excavated to study their remains", "homophones": ["zoologico-archaeologist", "zoologico-archeologist", "zoologico-archæologist", "zoologicoarcheologist", "zoologicoarchæologist"]},
         "zygomaticomaxillary": {"part_of_speech": "adjective", "definition": "relating to the cheekbone and upper jaw", "homophones": []}
     },
     "master": {
@@ -673,7 +673,7 @@
         "pharyngealizedvoicelessalveolarfricative": {"part_of_speech": "noun", "definition": "consonnant sound close to a \"s\" written /sˤ/ in IPA", "homophones": ["pharyngealized voiceless alveolar fricative", "pharyngealisedvoicelessalveolarfricative", "pharyngealised voiceless alveolar fricative"]},
         "pneumonoultramicroscopicsilicovolcanoconiosis": {"part_of_speech": "noun", "definition": "a lung disease resulting from inhaling extremely fine mineral dust", "homophones": ["pneumonoultramicroscopicsilicovolcanokoniosis"]},
         "pseudochaetosphaeronemaxishuangbannaense": {"part_of_speech": "noun", "definition": "a fungal species recently identified in China", "homophones": ["pseudochaetosphaeronema xishuangbannaense"]},
-        "pseudodeltoidalicositetrahedron": {"part_of_speech": "noun", "definition": "A convex 24-sided polyhedron made of identical kites", "homophones": ["pseudo-deltoidal icositetrahedron"]},
+        "pseudodeltoidalicositetrahedron": {"part_of_speech": "noun", "definition": "a convex 24-sided polyhedron made of identical kites", "homophones": ["pseudo-deltoidal icositetrahedron"]},
         "pseudopseudohypoparathyroidism": {"part_of_speech": "noun", "definition": "an inherited condition resembling a hormone deficiency without the biochemical cause", "homophones": []},
         "quattuorquinquagintaquadringentillion": {"part_of_speech": "number", "definition": "a one followed by 1,365 zeroes", "homophones": []},
         "radioimmunoelectrophoresis": {"part_of_speech": "noun", "definition": "a laboratory method combining antibodies and electric fields to identify proteins", "homophones": []},
