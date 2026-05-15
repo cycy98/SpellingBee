@@ -90,7 +90,7 @@
         "water": {"part_of_speech": "noun", "definition": "a clear liquid essential for life", "homophones": []},
         "win": {"part_of_speech": "verb", "definition": "to achieve victory", "homophones": ["winne", "wynn"]},
         "write": {"part_of_speech": "verb", "definition": "to form letters or words", "homophones": ["right", "rite", "wright"]},
-        "xray": {"part_of_speech": "noun", "definition": "a form of radiation used for imaging", "homophones": []},
+        "xray": {"part_of_speech": "noun", "definition": "a form of radiation used for imaging", "homophones": ["x-ray"]},
         "yes": {"part_of_speech": "particle", "definition": "used to show agreement", "homophones": []},
         "yoyo": {"part_of_speech": "noun", "definition": "a toy on a string", "homophones": ["yo-yo"]},
         "zoo": {"part_of_speech": "noun", "definition": "a place where animals are kept for viewing", "homophones": []},
