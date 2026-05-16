@@ -31,6 +31,72 @@ class WordEntry(TypedDict):
 
 type WordData = dict[str, dict[str, WordEntry]]
 
+def dumps_max_indent(obj, *, indent=4, max_indent_level=2, **json_kwargs):
+    """
+    Like json.dumps(), but only pretty-prints up to `max_indent_level`.
+
+    Deeper levels are rendered in compact form.
+
+    Example:
+        dumps_max_indent(data, indent=2, max_indent_level=2)
+
+    Parameters
+    ----------
+    obj : any
+        JSON-serializable object.
+    indent : int or str
+        Same meaning as in json.dumps().
+    max_indent_level : int
+        Maximum depth that will be indented.
+    **json_kwargs
+        Extra arguments forwarded to json.dumps().
+    """
+
+    indent_str = " " * indent if isinstance(indent, int) else indent
+
+    separators_compact = json_kwargs.pop("separators", (",", ":"))
+
+    def render(value, level):
+        # Primitive values
+        if not isinstance(value, (dict, list, tuple)):
+            return json.dumps(value, **json_kwargs)
+
+        # Compact mode beyond max depth
+        if level >= max_indent_level:
+            return json.dumps(
+                value,
+                separators=separators_compact,
+                **json_kwargs,
+            )
+
+        current_indent = indent_str * level
+        next_indent = indent_str * (level + 1)
+
+        # Dicts
+        if isinstance(value, dict):
+            if not value:
+                return "{}"
+
+            parts = []
+            for k, v in value.items():
+                key = json.dumps(k, **json_kwargs)
+                val = render(v, level + 1)
+                parts.append(f"{next_indent}{key}: {val}")
+
+            return "{\n" + ",\n".join(parts) + f"\n{current_indent}" + "}"
+
+        # Lists / tuples
+        if not value:
+            return "[]"
+
+        parts = [
+            f"{next_indent}{render(item, level + 1)}"
+            for item in value
+        ]
+
+        return "[\n" + ",\n".join(parts) + f"\n{current_indent}" + "]"
+
+    return render(obj, 0)
 
 def _sorted(data: WordData) -> WordData:
     result: WordData = {}
@@ -187,7 +253,7 @@ def save_data(path: Path, data: WordData) -> None:
     _check_invariants(data)
     ordered: dict = {level: data[level] for level in LEVELS if level in data}
     ordered |= {k: v for k, v in data.items() if k not in LEVELS}
-    text = json.dumps(ordered, ensure_ascii=False, indent=4)
+    text = dumps_max_indent(ordered, ensure_ascii=False, indent=4)
     path.write_text(text, encoding="utf-8")
 
 
