@@ -3107,7 +3107,9 @@
         "quoddamodotative": {
             "part_of_speech": "adjective",
             "definition": "in some manner or to a certain degree, somewhat, partially",
-            "homophones": []
+            "homophones": [
+                "quodamodotative"
+            ]
         },
         "spectrophotometry": {
             "part_of_speech": "noun",
@@ -3139,8 +3141,7 @@
             "definition": "the sound \"w\"",
             "homophones": [
                 "voiced labial velar approximant",
-                "voiced labial-velar approximant",
-                "xipho-omphalois-chiopagus"
+                "voiced labial-velar approximant"
             ]
         },
         "voicelessdentolabialaffricate": {
@@ -3159,7 +3160,7 @@
         "xiphoomphaloischiopagus": {
             "part_of_speech": "adjective",
             "definition": "describing conjoined twins joined at three points on the chest",
-            "homophones": []
+            "homophones": ["xipho-omphalois-chiopagus"]
         },
         "zoologicoarchaeologist": {
             "part_of_speech": "noun",
