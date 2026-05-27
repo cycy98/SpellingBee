@@ -31,6 +31,7 @@ class WordEntry(TypedDict):
 
 type WordData = dict[str, dict[str, WordEntry]]
 
+
 def dumps_max_indent(obj, *, indent=4, max_indent_level=2, **json_kwargs):
     """
     Like json.dumps(), but only pretty-prints up to `max_indent_level`.
@@ -89,14 +90,12 @@ def dumps_max_indent(obj, *, indent=4, max_indent_level=2, **json_kwargs):
         if not value:
             return "[]"
 
-        parts = [
-            f"{next_indent}{render(item, level + 1)}"
-            for item in value
-        ]
+        parts = [f"{next_indent}{render(item, level + 1)}" for item in value]
 
         return "[\n" + ",\n".join(parts) + f"\n{current_indent}" + "]"
 
     return render(obj, 0)
+
 
 def _sorted(data: WordData) -> WordData:
     result: WordData = {}

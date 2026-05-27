@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import pathlib
 import re
 import time
 from contextlib import asynccontextmanager
@@ -310,6 +311,17 @@ class AccessLogMiddleware:
 
 @asynccontextmanager
 async def _lifespan(_app: Starlette):
+    if Ruleset:
+        rs = Ruleset()
+        rs.allow(str(ROOT / "templates"))
+        rs.allow(str(ROOT / "static"))
+        rs.allow(str(ROOT / "audios"))
+        rs.allow(str(DB_PATH))
+        rs.apply()
+        logging.info("Succeeded sandboxing.")
+    else:
+        logging.warning("Skipping sandboxing.")
+
     await db.init(DB_PATH)
     catalog = Catalog.load(ROOT)
     templates.env.globals["tier_colors"] = catalog.tier_colors
@@ -323,14 +335,9 @@ async def _lifespan(_app: Starlette):
 
     state.spawn(_purge_loop(), name="purge-loop")
 
-    if Ruleset and False:
-        rs = Ruleset()
-        rs.allow("/etc")
-        rs.allow(".")
-        rs.apply()
-        logging.info("Succeeded sandboxing.")
-    else:
-        logging.warning("Skipping sandboxing.")
+    _sock = "/run/webapps/spelling.sock"
+    if pathlib.Path(_sock).exists():
+        pathlib.Path(_sock).chmod(0o660)
 
     _bot: BotCore | None = None
     if _token := os.environ.get("DISCORD_TOKEN"):

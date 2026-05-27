@@ -11,6 +11,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "python-multipart>=0.0.26",
     "sse-starlette>=3.3.4",
+    "uvicorn>=0.48.0",
 ]
 
 [project.optional-dependencies]

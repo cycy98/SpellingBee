@@ -14,6 +14,8 @@ from backend.game import (
     ROOM_CODE_LEN,
     STALE_MINUTES,
     Catalog,
+    GameEvent,
+    MatchCompleteEvent,
     Ranking,
     Room,
     Session,
@@ -26,19 +28,6 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine
 
 DISCONNECT_GRACE = 30  # seconds before a disconnected player is auto-forfeited
-
-
-@dataclass(frozen=True)
-class MatchCompleteEvent:
-    username: str
-    rank: int
-    elo_delta: float
-    room_code: str
-    visibility: str  # "public" | "private" | "solo" | "local"
-    n_players: int
-
-
-GameEvent = MatchCompleteEvent
 
 
 @dataclass
@@ -172,31 +161,36 @@ class AppState:
         room = self.rooms.get(code)
         if not room:
             return
-        now = time.time()
-        targets = []
-        game = room.current_game
-        if game and game.turn_deadline > now:
-            targets.append(game.turn_deadline)
-        if room.intermission_until > now:
-            targets.append(room.intermission_until)
-        if not targets:
+        deadline = room.next_deadline()
+        if deadline is None:
             return
-        delay = min(targets) - now
         loop = asyncio.get_running_loop()
-        self.room_timers[code] = loop.call_later(delay, self._room_timer_fire, code)
+        self.room_timers[code] = loop.call_later(deadline - time.time(), self._room_timer_fire, code)
 
     async def finalize_mutation(self, code: str, rankings: list[Ranking] | None) -> None:
         room = self.rooms.get(code)
         if not room:
             return
+        if rankings:
+            elo_results = await persist_match_elo(room, rankings)
+            if room.current_game:
+                room.current_game.apply_elo_results(elo_results)
+            n = len(elo_results)
+            for r in elo_results:
+                self.event_queue.put_nowait(
+                    MatchCompleteEvent(
+                        username=r.username,
+                        rank=r.rank,
+                        elo_delta=r.elo_delta,
+                        room_code=code,
+                        visibility=room.visibility,
+                        n_players=n,
+                    ),
+                )
         if not room.sessions:
-            if rankings:
-                await persist_match_elo(room, rankings, notify=None, app_state=self)
             self._destroy_room(code)
             return
         self.room_changed(code)
-        if rankings:
-            await persist_match_elo(room, rankings, notify=self.room_changed, app_state=self)
 
     def _room_timer_fire(self, code: str) -> None:
         self.room_timers.pop(code, None)
