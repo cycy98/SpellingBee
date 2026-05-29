@@ -67,7 +67,7 @@ class AppState:
         if not available:
             msg = "all room codes exhausted"
             raise RuntimeError(msg)
-        return random.choice(available)
+        return random.choice(available)  # noqa: S311
 
     def check_rate(self, ip: str, action: str) -> bool:
         limit, window = RATE_LIMITS[action]

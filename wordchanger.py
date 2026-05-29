@@ -130,7 +130,7 @@ def _coerce_entry(raw: object) -> WordEntry:
 def validate_data(raw: object) -> WordData:
     if not isinstance(raw, dict):
         msg = "wordlist.json must contain a JSON object at the top level"
-        raise ValueError(msg)
+        raise TypeError(msg)
     data: WordData = {level: {} for level in LEVELS}
     seen: set[str] = set()
     for level in LEVELS:
@@ -322,13 +322,14 @@ class App:
         try:
             self._commit(fn(self.data))
             self.refresh_word_list()
-            return True
         except ValueError as e:
             messagebox.showerror("Error", str(e))
             return False
         except OSError as e:
             messagebox.showerror("Save Error", str(e))
             return False
+        else:
+            return True
 
     def _selected_word(self) -> str | None:
         sel = self.word_list.curselection()

@@ -1,4 +1,4 @@
-"""Spelling Bee — FastAPI HTTP shell."""
+"""Spelling Bee — HTTP shell."""
 
 from __future__ import annotations
 
@@ -51,6 +51,8 @@ from discord_bot.bot import BotCore
 from routes.account import routes as account_routes
 from routes.auth import routes as auth_routes
 from templating import client_ip, templates, tpl
+
+logger = logging.getLogger(__name__)
 
 try:
     from landlock import Ruleset
@@ -318,9 +320,9 @@ async def _lifespan(_app: Starlette):
         rs.allow(str(ROOT / "audios"))
         rs.allow(str(DB_PATH))
         rs.apply()
-        logging.info("Succeeded sandboxing.")
+        logger.info("Succeeded sandboxing.")
     else:
-        logging.warning("Skipping sandboxing.")
+        logger.warning("Skipping sandboxing.")
 
     await db.init(DB_PATH)
     catalog = Catalog.load(ROOT)
@@ -336,8 +338,8 @@ async def _lifespan(_app: Starlette):
     state.spawn(_purge_loop(), name="purge-loop")
 
     _sock = "/run/webapps/spelling.sock"
-    if pathlib.Path(_sock).exists():
-        pathlib.Path(_sock).chmod(0o660)
+    if pathlib.Path(_sock).exists():  # noqa: ASYNC240
+        pathlib.Path(_sock).chmod(0o660)  # noqa: ASYNC240
 
     _bot: BotCore | None = None
     if _token := os.environ.get("DISCORD_TOKEN"):
@@ -372,7 +374,7 @@ async def htmx_error_handler(request: Request, exc: Exception) -> Response:  # n
 # PWA
 
 
-async def service_worker(request: Request) -> FileResponse:
+async def service_worker(request: Request) -> FileResponse:  # noqa: ARG001
     return FileResponse(
         ROOT / "static" / "sw.js",
         media_type="text/javascript",
@@ -380,7 +382,7 @@ async def service_worker(request: Request) -> FileResponse:
     )
 
 
-async def manifest(request: Request) -> Response:
+async def manifest(request: Request) -> Response:  # noqa: ARG001
     return Response(
         json.dumps(
             {
@@ -549,7 +551,7 @@ async def guess(request: Request) -> Response:  # noqa: PLR0915
 # Room creation / joining
 
 
-async def room_create(request: Request) -> Response:
+async def room_create(request: Request) -> Response:  # noqa: PLR0915
     state: AppState = request.app.state.srv
     check_creation_limits(state, request)
 
