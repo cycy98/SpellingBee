@@ -344,7 +344,7 @@
     <h3>Data</h3>
     <article>
       <p>
-        <a href="account/export" download="{{ player.username }}-data.json">Download my data (JSON)</a>
+        <a href="{{ url_for('export_account') }}" download="{{ player.username }}-data.json">Download my data (JSON)</a>
       </p>
       <hr />
       <details>

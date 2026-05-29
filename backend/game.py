@@ -53,6 +53,27 @@ class MatchResult(TypedDict):
     elo_delta: NotRequired[float]
 
 
+class EloResult(NamedTuple):
+    sid: str
+    username: str
+    rank: int
+    elo: float
+    elo_delta: float
+
+
+@dataclass(frozen=True)
+class MatchCompleteEvent:
+    username: str
+    rank: int
+    elo_delta: float
+    room_code: str
+    visibility: str
+    n_players: int
+
+
+GameEvent = MatchCompleteEvent
+
+
 # Config
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -277,7 +298,8 @@ class Game:
         self.draft_text = ""
         word_str = word_data["word"]
         is_solo = self.visibility == "solo"
-        tl = compute_time_limit(word_str, streak=streak, multiplayer=not is_solo)
+        wpm_target = 10.0 if not is_solo else 5 * streak**0.8 + 10
+        tl = compute_time_limit(word_str, wpm_target=wpm_target)
         self.turn_time_limit = tl
         self.word_audio_duration = self.catalog.audio_durations.get(word_str.lower(), 0.0)
         self.turn_deadline = time.time() + tl + self.word_audio_duration + NETWORK_GRACE
@@ -363,39 +385,37 @@ class Game:
         self.eliminate(active)
         return self.advance_turn(eliminated=True)
 
-    def _apply_to_participant(
-        self,
-        participant: GameParticipant,
-        result: GuessResult,
-        is_solo: bool,
-    ) -> None:
+    def _update_stats(self, participant: GameParticipant, result: GuessResult, is_solo: bool) -> None:
         if result.correct:
             participant.words_correct += 1
             if is_solo:
                 participant.streak += 1
                 participant.best_streak = max(participant.best_streak, participant.streak)
-            fb: Feedback = {"title": "Correct", "type": "success", "wpm": result.wpm}
+        elif is_solo:
+            participant.streak = 0
+
+    @staticmethod
+    def _build_feedback(result: GuessResult, is_solo: bool, timed_out: bool) -> Feedback:
+        if timed_out:
+            fb: Feedback = {"title": "Time's up", "type": "error", "word": result.word}
+            fb["definition"] = result.definition
+            return fb
+        if result.correct:
+            fb = {"title": "Correct", "type": "success", "wpm": result.wpm}
             if result.homophone:
                 fb["homophone"] = result.homophone
             if not is_solo:
                 fb["body"] = "You stay in."
-        else:
-            if is_solo:
-                participant.streak = 0
-            title = ("Skipped" if result.skipped else "Incorrect") if is_solo else "Eliminated"
-            fb = {
-                "title": title,
-                "type": "error",
-                "word": result.word,
-                "definition": result.definition,
-            }
-            if result.skipped and not is_solo:
-                fb["body"] = "Skipped."
-            if not result.skipped and is_solo:
-                fb["wpm"] = result.wpm
-            if result.alternatives:
-                fb["alternatives"] = result.alternatives
-        participant.last_feedback = fb
+            return fb
+        title = ("Skipped" if result.skipped else "Incorrect") if is_solo else "Eliminated"
+        fb = {"title": title, "type": "error", "word": result.word, "definition": result.definition}
+        if result.skipped and not is_solo:
+            fb["body"] = "Skipped."
+        if not result.skipped and is_solo:
+            fb["wpm"] = result.wpm
+        if result.alternatives:
+            fb["alternatives"] = result.alternatives
+        return fb
 
     def submit_guess(
         self,
@@ -442,14 +462,8 @@ class Game:
             streak_at_guess=streak_before,
         )
 
-        self._apply_to_participant(participant, result, is_solo)
-        if timed_out:
-            participant.last_feedback = {
-                "title": "Time's up",
-                "type": "error",
-                "word": result.word,
-                "definition": result.definition,
-            }
+        self._update_stats(participant, result, is_solo)
+        participant.last_feedback = self._build_feedback(result, is_solo, timed_out)
 
         rankings = None
         if is_solo:
@@ -464,6 +478,36 @@ class Game:
 
     def set_draft(self, text: str) -> None:
         self.draft_text = text
+
+    def runner_up_sid(self) -> str | None:
+        eliminated = [p for p in self.participants.values() if p.eliminated]
+        if not eliminated:
+            return None
+        return max(eliminated, key=lambda p: p.elimination_order).sid
+
+    def remove_player(self, sid: str) -> list[Ranking] | None:
+        """Forcibly remove an active participant: eliminate, then finish or advance."""
+        if sid not in self.participants or self.participants[sid].eliminated:
+            return None
+        prev_active = self.active_sid()
+        was_active = prev_active == sid
+        self.eliminate(sid)
+        alive = self.alive_sids()
+        if len(alive) <= 1 and self.current_word and not self.winner:
+            return self.finish()
+        if was_active and alive:
+            return self.advance_turn(eliminated=True)
+        if alive and prev_active and prev_active in alive:
+            self.turn_index = alive.index(prev_active)
+        return None
+
+    def apply_elo_results(self, results: list[EloResult]) -> None:
+        by_sid = {r.sid: r for r in results}
+        for entry in self.last_match_results:
+            er = by_sid.get(entry["sid"])
+            if er:
+                entry["elo"] = round(er.elo, 1)
+                entry["elo_delta"] = round(er.elo_delta, 1)
 
 
 @dataclass
@@ -519,13 +563,8 @@ class Room:
 
     def start_new_game(self) -> None:
         prev_game = self.current_game
-        starting_sid = None
-        if prev_game and prev_game.turn_order:
-            eliminated = [p for p in prev_game.participants.values() if p.eliminated]
-            if eliminated:
-                last_eliminated = max(eliminated, key=lambda p: p.elimination_order)
-                if last_eliminated.sid in self.sessions:
-                    starting_sid = last_eliminated.sid
+        runner_up = prev_game.runner_up_sid() if prev_game else None
+        starting_sid = runner_up if runner_up and runner_up in self.sessions else None
         self.intermission_until = 0
         self.ready_votes.clear()
         self.start_game(starting_sid=starting_sid)
@@ -539,6 +578,15 @@ class Room:
             self.start_new_game()
         return rankings
 
+    def next_deadline(self) -> float | None:
+        now = time.time()
+        candidates = []
+        if self.current_game and self.current_game.turn_deadline > now:
+            candidates.append(self.current_game.turn_deadline)
+        if self.intermission_until > now:
+            candidates.append(self.intermission_until)
+        return min(candidates) if candidates else None
+
     def begin_if_ready(self) -> bool:
         if self.visibility == "private":
             return False
@@ -551,21 +599,8 @@ class Room:
     def forfeit(self, sid: str) -> list[Ranking] | None:
         if sid not in self.sessions:
             return None
-        rankings = None
         game = self.current_game
-        if game and sid in game.participants and not game.participants[sid].eliminated:
-            prev_active = game.active_sid()
-            was_active = prev_active == sid
-            game.eliminate(sid)
-            alive = game.alive_sids()
-            if len(alive) <= 1 and game.current_word and not game.winner:
-                rankings = game.finish()
-            elif was_active and alive:
-                game.turn_index = game.turn_index % len(alive)
-                game.draft_text = ""
-                game.serve_new_word()
-            elif alive and prev_active and prev_active in alive:
-                game.turn_index = alive.index(prev_active)
+        rankings = game.remove_player(sid) if game else None
         # Lobby removal — does NOT affect game.participants
         self.ready_votes.discard(sid)
         self.spectators.discard(sid)
@@ -635,10 +670,9 @@ def active_session_id(room: Room) -> str | None:
     return room.current_game.active_sid()
 
 
-def compute_time_limit(word: str, streak: int = 0, multiplayer: bool = False) -> float:
+def compute_time_limit(word: str, wpm_target: float) -> float:
     chars = max(len(word) / 5, 0.2)
-    wpm_required = 10.0 if multiplayer else 5 * streak**0.8 + 10
-    return max(3.0, (chars / wpm_required) * 60)
+    return max(3.0, (chars / wpm_target) * 60)
 
 
 def typing_window_s(
@@ -667,19 +701,17 @@ def _normalize(s: str) -> str:
     return s.translate(_LIGATURES)
 
 
+def _word_matches(g: str, candidate: str) -> bool:
+    return g == candidate or (any(c in candidate for c in "æœ") and g == _normalize(candidate))
+
+
 def evaluate_guess(guess: str, word_entry: WordEntry) -> tuple[bool, str | None]:
     """Returns (correct, matched_homophone_or_None)."""
-    target = word_entry["word"].lower()
     g = guess.strip().lower()
-    if g == target:
-        return True, None
-    if any(c in target for c in "æœ") and g == _normalize(target):
+    if _word_matches(g, word_entry["word"].lower()):
         return True, None
     for h in word_entry.get("homophones", []):
-        hl = h.lower()
-        if g == hl:
-            return True, h
-        if any(c in hl for c in "æœ") and g == _normalize(hl):
+        if _word_matches(g, h.lower()):
             return True, h
     return False, None
 

@@ -1,4 +1,4 @@
-"""Spelling Bee — FastAPI HTTP shell."""
+"""Spelling Bee — HTTP shell."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import pathlib
 import re
 import time
 from contextlib import asynccontextmanager
@@ -50,6 +51,8 @@ from discord_bot.bot import BotCore
 from routes.account import routes as account_routes
 from routes.auth import routes as auth_routes
 from templating import client_ip, templates, tpl
+
+logger = logging.getLogger(__name__)
 
 try:
     from landlock import Ruleset
@@ -310,6 +313,17 @@ class AccessLogMiddleware:
 
 @asynccontextmanager
 async def _lifespan(_app: Starlette):
+    if Ruleset:
+        rs = Ruleset()
+        rs.allow(str(ROOT / "templates"))
+        rs.allow(str(ROOT / "static"))
+        rs.allow(str(ROOT / "audios"))
+        rs.allow(str(DB_PATH))
+        rs.apply()
+        logger.info("Succeeded sandboxing.")
+    else:
+        logger.warning("Skipping sandboxing.")
+
     await db.init(DB_PATH)
     catalog = Catalog.load(ROOT)
     templates.env.globals["tier_colors"] = catalog.tier_colors
@@ -323,14 +337,9 @@ async def _lifespan(_app: Starlette):
 
     state.spawn(_purge_loop(), name="purge-loop")
 
-    if Ruleset and False:
-        rs = Ruleset()
-        rs.allow("/etc")
-        rs.allow(".")
-        rs.apply()
-        logging.info("Succeeded sandboxing.")
-    else:
-        logging.warning("Skipping sandboxing.")
+    _sock = "/run/webapps/spelling.sock"
+    if pathlib.Path(_sock).exists():  # noqa: ASYNC240
+        pathlib.Path(_sock).chmod(0o660)  # noqa: ASYNC240
 
     _bot: BotCore | None = None
     if _token := os.environ.get("DISCORD_TOKEN"):
@@ -365,7 +374,7 @@ async def htmx_error_handler(request: Request, exc: Exception) -> Response:  # n
 # PWA
 
 
-async def service_worker(request: Request) -> FileResponse:
+async def service_worker(request: Request) -> FileResponse:  # noqa: ARG001
     return FileResponse(
         ROOT / "static" / "sw.js",
         media_type="text/javascript",
@@ -373,7 +382,7 @@ async def service_worker(request: Request) -> FileResponse:
     )
 
 
-async def manifest(request: Request) -> Response:
+async def manifest(request: Request) -> Response:  # noqa: ARG001
     return Response(
         json.dumps(
             {
@@ -542,7 +551,7 @@ async def guess(request: Request) -> Response:  # noqa: PLR0915
 # Room creation / joining
 
 
-async def room_create(request: Request) -> Response:
+async def room_create(request: Request) -> Response:  # noqa: PLR0915
     state: AppState = request.app.state.srv
     check_creation_limits(state, request)
 

@@ -31,6 +31,7 @@ class WordEntry(TypedDict):
 
 type WordData = dict[str, dict[str, WordEntry]]
 
+
 def dumps_max_indent(obj, *, indent=4, max_indent_level=2, **json_kwargs):
     """
     Like json.dumps(), but only pretty-prints up to `max_indent_level`.
@@ -89,14 +90,12 @@ def dumps_max_indent(obj, *, indent=4, max_indent_level=2, **json_kwargs):
         if not value:
             return "[]"
 
-        parts = [
-            f"{next_indent}{render(item, level + 1)}"
-            for item in value
-        ]
+        parts = [f"{next_indent}{render(item, level + 1)}" for item in value]
 
         return "[\n" + ",\n".join(parts) + f"\n{current_indent}" + "]"
 
     return render(obj, 0)
+
 
 def _sorted(data: WordData) -> WordData:
     result: WordData = {}
@@ -131,7 +130,7 @@ def _coerce_entry(raw: object) -> WordEntry:
 def validate_data(raw: object) -> WordData:
     if not isinstance(raw, dict):
         msg = "wordlist.json must contain a JSON object at the top level"
-        raise ValueError(msg)
+        raise TypeError(msg)
     data: WordData = {level: {} for level in LEVELS}
     seen: set[str] = set()
     for level in LEVELS:
@@ -323,13 +322,14 @@ class App:
         try:
             self._commit(fn(self.data))
             self.refresh_word_list()
-            return True
         except ValueError as e:
             messagebox.showerror("Error", str(e))
             return False
         except OSError as e:
             messagebox.showerror("Save Error", str(e))
             return False
+        else:
+            return True
 
     def _selected_word(self) -> str | None:
         sel = self.word_list.curselection()
