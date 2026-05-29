@@ -609,7 +609,7 @@
         "lepidopterophobia": {"part_of_speech":"noun","definition":"an irrational fear of butterflies or moths","homophones":[]},
         "microneovascularization": {"part_of_speech":"noun","definition":"the process of forming or developing extremely small blood vessels","homophones":["microneovascularisation"]},
         "mustafakemalpaşa": {"part_of_speech":"noun","definition":"a city in Türkiye","homophones":["mustafakemalpasa"]},
-        "nasalassimilation": {"part_of_speech":"noun","definition":"the process by which a sound like /n/ or /m/ changes its place of articulation to match an adjacent sound","homophones":[]},
+        "nasalassimilation": {"part_of_speech":"noun","definition":"the process by which a sound like /n/ or /m/ changes its place of articulation to match an adjacent sound","homophones":["nasal assimilation"]},
         "oligodendrocyte": {"part_of_speech":"noun","definition":"a type of glial cell in the central nervous system that produces myelin","homophones":[]},
         "paradichlorobenzene": {"part_of_speech":"noun","definition":"a chemical compound used in mothballs and deodorizing products with a strong distinctive smell","homophones":[]},
         "pericholecystitis": {"part_of_speech":"noun","definition":"inflammation of the tissue surrounding the gallbladder","homophones":[]},
@@ -722,7 +722,7 @@
         "thermoelectromagnetoelastic": {"part_of_speech":"adjective","definition":"involving coupled thermal, field-driven, and mechanical deformation effects","homophones":["thermo-electro-magneto-elastic"]},
         "thyroparathyroidectomized": {"part_of_speech":"adjective","definition":"having undergone surgical removal of certain neck glands involved in hormone regulation","homophones":["thyroparathyroidectomised"]},
         "uridinediphosphateglucosepyrophosphorylase": {"part_of_speech":"noun","definition":"an intracellular enzyme involved in the regulation of carbon partitioning into cellulose and starch","homophones":["uridine diphosphate glucose pyrophosphorylase"]},
-        "voicelessalveolopalatalsibilantfricative": {"part_of_speech":"noun","definition":"consonnant sound close to a \"sh\", written /ɕ/ in IPA","homophones":[]}
+        "voicelessalveolopalatalsibilantfricative": {"part_of_speech":"noun","definition":"consonnant sound close to a \"sh\", written /ɕ/ in IPA","homophones":["voiceless alveolo-palatal sibilant fricative"]}
     },
     "info": {
         "color": {"starter":"#00ff00","easy":"#00ffff","tricky":"#ffff00","advanced":"#ff0000","insane":"#ff00ff","expert":"#ff8f00","master":"#333333","sesquipedalian":"#ffffff"}

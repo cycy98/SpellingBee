@@ -656,7 +656,6 @@ def typing_window_s(
 
 
 def compute_wpm(guess: str, elapsed: float) -> float:
-    elapsed = max(elapsed, 2.0)
     chars = max(len(guess) / 5, 0.2)
     return min(300.0, chars / (elapsed / 60))
 
