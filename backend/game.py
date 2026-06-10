@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from collections import deque
+from dataclasses import dataclass, field
+import datetime
 import json
 import math
+from pathlib import Path
 import re
 import secrets
 import time
-from collections import deque
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Literal, NamedTuple, NotRequired, TypedDict, cast
 
 # Domain types
@@ -121,6 +122,10 @@ MAX_SESSIONS_PER_IP = 10
 MAX_PLAYERS = 15
 MAX_LOCAL_PLAYERS = 12
 
+# Scheduled update: before this UTC timestamp the auxiliary wordlist (if present)
+# will be used.
+UPDATE_EFFECTIVE_UTC = datetime.datetime(2026, 7, 1, 10, 0, tzinfo=datetime.UTC)
+
 RATE_LIMITS: dict[str, tuple[int, int]] = {
     "login": (5, 60),
     "register": (3, 60),
@@ -156,7 +161,20 @@ class Catalog:
 
     @classmethod
     def load(cls, root: Path) -> Catalog:
-        with (root / "wordlist.json").open() as f:
+        # Choose an auxiliary wordlist before the scheduled update so running
+        # instances keep using the old list even if a new push replaces
+        # `wordlist.json` on disk. If the auxiliary file doesn't exist,
+        # fall back to the normal file.
+        def _select_wordlist_file(root_path: Path) -> Path:
+            aux = root_path / "wordlist_aux.json"
+            main = root_path / "wordlist.json"
+            now = datetime.datetime.now(datetime.UTC)
+            if now < UPDATE_EFFECTIVE_UTC and aux.is_file():
+                return aux
+            return main
+
+        wl_path = _select_wordlist_file(root)
+        with wl_path.open() as f:
             raw: dict[str, Any] = json.load(f)
         return cls(
             tier_colors=raw["info"]["color"],
